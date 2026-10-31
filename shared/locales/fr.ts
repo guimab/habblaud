@@ -1718,6 +1718,10 @@ export const FR: Readonly<Record<string, string>> = {
   "resposta do Hermes sem corpo": "réponse de Hermes sans corps",
   "run desconhecido": "run inconnu",
   "O Habblaud foi atualizado e esta página ficou desatualizada. Recarregar agora?": "Habblaud a été mis à jour et cette page n'est plus à jour. Recharger maintenant ?",
+  "intervalo: de {0} minutos a 7 dias": "intervalle : de {0} minutes à 7 jours",
+  "escolha ao menos um dia da semana": "choisissez au moins un jour de la semaine",
+  "horário inválido (HH:MM)": "heure invalide (HH:MM)",
+  "agenda inválida: uma vez, a cada N minutos ou dias da semana": "planification invalide : une fois, toutes les N minutes ou jours de la semaine",
   "Não consegui gravar {0}: {1}": "Impossible d'écrire {0} : {1}",
 
   // server/permissions/codex.ts

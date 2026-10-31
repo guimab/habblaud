@@ -1857,6 +1857,10 @@ export const EN: Readonly<Record<string, string>> = {
   "resposta do Hermes sem corpo": "Hermes reply without body",
   "run desconhecido": "unknown run",
   "O Habblaud foi atualizado e esta página ficou desatualizada. Recarregar agora?": "Habblaud was updated and this page is out of date. Reload now?",
+  "intervalo: de {0} minutos a 7 dias": "interval: from {0} minutes to 7 days",
+  "escolha ao menos um dia da semana": "pick at least one weekday",
+  "horário inválido (HH:MM)": "invalid time (HH:MM)",
+  "agenda inválida: uma vez, a cada N minutos ou dias da semana": "invalid schedule: once, every N minutes or weekdays",
   "Não consegui gravar {0}: {1}": "Couldn't write {0}: {1}",
 
   // server/permissions/codex.ts
