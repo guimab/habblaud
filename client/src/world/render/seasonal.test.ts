@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseColor } from '../../art/core/color';
 import type { WallStyle } from '../../art/api';
-import { seasonalCostume, seasonalFloorTint, seasonalRugColor, seasonalWallStyle } from './seasonal';
+import { seasonalCostume, seasonalFloorTint, seasonalPropFor, seasonalRugColor, seasonalWallStyle } from './seasonal';
 
 const lum = (c: string) => {
   const [r, g, b] = parseColor(c);
@@ -46,5 +46,29 @@ describe('tema cyberpunk', () => {
   it('personagem não ganha figurino (o visual é do escritório)', () => {
     expect(seasonalCostume('cyberpunk', 0)).toBeUndefined();
     expect(seasonalCostume('cyberpunk', 7)).toBeUndefined();
+  });
+});
+
+describe('tema cyberpunk: qual enfeite troca cada planta', () => {
+  it('a planta grande vira holograma (só a primeira da área) e a pequena vira terminal', () => {
+    expect(seasonalPropFor('cyberpunk', 'plant_tall', 'room', true, 3)).toBe('holo');
+    expect(seasonalPropFor('cyberpunk', 'plant_tall', 'room', false, 3)).toBeNull();
+    expect(seasonalPropFor('cyberpunk', 'plant_small', 'room', false, 3)).toBe('terminal');
+  });
+
+  it('banheiro e móveis que não são planta ficam sem enfeite', () => {
+    expect(seasonalPropFor('cyberpunk', 'plant_tall', 'restroom', true, 3)).toBeNull();
+    expect(seasonalPropFor('cyberpunk', 'plant_small', 'restroom', true, 3)).toBeNull();
+    expect(seasonalPropFor('cyberpunk', 'desk', 'room', true, 3)).toBeNull();
+  });
+
+  it('os outros temas seguem exatamente como estavam', () => {
+    expect(seasonalPropFor('none', 'plant_tall', 'room', true, 3)).toBeNull();
+    expect(seasonalPropFor('christmas', 'plant_tall', 'room', true, 3)).toBe('tree');
+    expect(seasonalPropFor('christmas', 'plant_small', 'room', true, 3)).toBe('gift');
+    expect(seasonalPropFor('halloween', 'plant_tall', 'room', true, 8)).toBe('pumpkin');
+    expect(seasonalPropFor('halloween', 'plant_tall', 'room', true, 3)).toBe('ghost');
+    expect(seasonalPropFor('halloween', 'plant_small', 'room', true, 3)).toBe('pumpkin');
+    expect(seasonalPropFor('halloween', 'plant_tall', 'room', false, 3)).toBeNull();
   });
 });

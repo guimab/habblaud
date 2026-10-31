@@ -26,16 +26,32 @@ export function seasonalCostume(theme: SeasonalTheme, seed: number): CharacterFr
   return undefined;
 }
 
-/** Reutiliza footprints de plantas: nenhuma nova colisão ou mudança de caminhos. */
-export function seasonalFurniture(theme: SeasonalTheme, kind: FurnitureKind, area: AreaLayout, seed: number): Sprite | null {
-  if (theme === 'none' || theme === 'cyberpunk' || area.kind === 'restroom') return null;
+/**
+ * Qual enfeite do tema troca este móvel (puro, sem canvas). Reutiliza footprints de plantas: nenhuma nova colisão
+ * ou mudança de caminhos. No cyberpunk a primeira planta grande vira quiosque holográfico e a pequena, um terminal.
+ */
+export function seasonalPropFor(
+  theme: SeasonalTheme,
+  kind: FurnitureKind,
+  areaKind: AreaLayout['kind'],
+  firstPlantTall: boolean,
+  seed: number,
+): SeasonalProp | null {
+  if (theme === 'none' || areaKind === 'restroom') return null;
   if (kind === 'plant_tall') {
-    const first = area.furniture.find((f) => f.kind === 'plant_tall');
-    if (!first || hash32(first.id) !== seed) return null;
-    return prop(theme === 'christmas' ? 'tree' : seed % 3 === 0 ? 'ghost' : 'pumpkin');
+    if (!firstPlantTall) return null;
+    if (theme === 'cyberpunk') return 'holo';
+    return theme === 'christmas' ? 'tree' : seed % 3 === 0 ? 'ghost' : 'pumpkin';
   }
-  if (kind === 'plant_small') return prop(theme === 'christmas' ? 'gift' : 'pumpkin');
+  if (kind === 'plant_small') return theme === 'cyberpunk' ? 'terminal' : theme === 'christmas' ? 'gift' : 'pumpkin';
   return null;
+}
+
+export function seasonalFurniture(theme: SeasonalTheme, kind: FurnitureKind, area: AreaLayout, seed: number): Sprite | null {
+  const first = area.furniture.find((f) => f.kind === kind);
+  const firstPlantTall = kind === 'plant_tall' && !!first && hash32(first.id) === seed;
+  const p = seasonalPropFor(theme, kind, area.kind, firstPlantTall, seed);
+  return p ? prop(p) : null;
 }
 
 export function seasonalRugColor(theme: SeasonalTheme, original: string): string {

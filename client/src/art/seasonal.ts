@@ -2,7 +2,7 @@
 import { PixelBuf } from './core/pixbuf';
 import type { BufSprite } from './core/sprite';
 
-export type SeasonalProp = 'tree' | 'gift' | 'pumpkin' | 'ghost' | 'wreath' | 'bat';
+export type SeasonalProp = 'tree' | 'gift' | 'pumpkin' | 'ghost' | 'wreath' | 'bat' | 'holo' | 'terminal';
 
 export function renderSeasonalProp(kind: SeasonalProp): BufSprite {
   const b = new PixelBuf(40, 64);
@@ -73,6 +73,38 @@ export function renderSeasonalProp(kind: SeasonalProp): BufSprite {
     rect(15, 55, 4, 4, '#c93945');
     rect(21, 55, 4, 4, '#c93945');
     rect(19, 54, 2, 4, '#f07368');
+  } else if (kind === 'holo') {
+    // Quiosque de anúncio holográfico (Night City): base metálica, coluna e o painel flutuante com anúncio de neon.
+    b.shadow(20, 59, 10, 2, '#252c39', 0.22);
+    rect(14, 54, 12, 5, '#242a38');
+    rect(14, 54, 12, 1, '#39415a');
+    rect(16, 56, 8, 1, '#161b26');
+    rect(18, 42, 4, 12, '#1d2230');
+    b.vline(19, 42, 53, '#333c56');
+    rect(17, 40, 6, 2, '#144a5c'); // feixe do projetor
+    rect(10, 24, 20, 16, '#0e3242');
+    rect(11, 25, 18, 14, '#124b60');
+    for (let y = 26; y < 39; y += 3) b.hline(11, 28, y, '#1d7d99'); // varredura do holograma
+    rect(14, 28, 6, 3, '#fcee0a'); // o amarelo da cidade
+    rect(22, 28, 6, 3, '#fcee0a');
+    rect(14, 33, 14, 3, '#ff2e88'); // faixa de anúncio
+    b.set(20, 27, '#fff6a8');
+    b.set(25, 37, '#ffd0e6');
+  } else if (kind === 'terminal') {
+    // Máquina de venda / terminal de dados: corpo escuro e a tela verde de terminal.
+    b.shadow(20, 59, 11, 2, '#252c39', 0.22);
+    rect(10, 33, 20, 26, '#1f2431');
+    rect(10, 33, 20, 2, '#31384c');
+    rect(10, 57, 20, 2, '#141821');
+    rect(13, 36, 14, 11, '#0d2b25');
+    for (let y = 37; y < 46; y += 2) b.hline(14, 25, y, '#2ef28a');
+    b.set(24, 37, '#b9ffe0');
+    rect(13, 49, 14, 5, '#2a3040');
+    for (let x = 14; x < 26; x += 3) {
+      b.set(x, 50, '#46d6ff');
+      b.set(x, 52, '#46d6ff');
+    }
+    rect(16, 55, 8, 1, '#46d6ff'); // fenda de saída
   } else {
     rect(18, 51, 5, 6, '#47344f');
     rect(10, 50, 9, 4, '#47344f');
