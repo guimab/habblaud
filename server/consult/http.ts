@@ -1,4 +1,5 @@
 // Rotas do Consultor: /api/consult (listar, criar), /api/consult/:id/messages (conversa em SSE), DELETE (arquivar).
+import { tr } from '../../shared/i18n';
 import { RunError } from '../runs/manager';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { HttpError, readJson, sendJson } from '../http/app';
@@ -33,7 +34,7 @@ async function streamMessage(svc: ConsultService, req: IncomingMessage, res: Ser
 export async function readText(req: IncomingMessage): Promise<string> {
   const body = (await readJson(req)) as { text?: unknown } | null;
   const text = optText(body?.text, CONSULT_TEXT_MAX, 'text');
-  if (!text?.trim()) throw new HttpError(400, 'esperado {text: texto não vazio}');
+  if (!text?.trim()) throw new HttpError(400, tr('esperado {text: texto não vazio}'));
   return text;
 }
 
@@ -88,7 +89,7 @@ export function createConsultRoutes(svc: ConsultService): ConsultRoute {
     if (path !== '/api/consult' && !path.startsWith('/api/consult/')) return false;
     if (!allowed) {
       req.resume();
-      sendJson(res, 403, { error: 'consultor não liberado neste acesso' });
+      sendJson(res, 403, { error: tr('consultor não liberado neste acesso') });
       return true;
     }
     const rest = path.slice('/api/consult'.length).split('/').filter(Boolean).map(decodeURIComponent);
@@ -116,7 +117,7 @@ export function createConsultRoutes(svc: ConsultService): ConsultRoute {
       else allow(req, res, 'POST');
     } else {
       req.resume();
-      sendJson(res, 404, { error: 'rota desconhecida' });
+      sendJson(res, 404, { error: tr('rota desconhecida') });
     }
     return true;
   };
@@ -125,5 +126,5 @@ export function createConsultRoutes(svc: ConsultService): ConsultRoute {
 function allow(req: IncomingMessage, res: ServerResponse, methods: string) {
   req.resume();
   res.setHeader('Allow', methods);
-  sendJson(res, 405, { error: 'método não permitido' });
+  sendJson(res, 405, { error: tr('método não permitido') });
 }

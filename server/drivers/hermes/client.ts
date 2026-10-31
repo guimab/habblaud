@@ -1,4 +1,5 @@
 // Driver do Hermes: fala só com a API HTTP do gateway (API_SERVER_*). Nada de state.db.
+import { tr } from '../../../shared/i18n';
 import { APPROVAL_CHOICES, type AgentDriver, type ApprovalChoice, type ApprovalRequest, type ChatEvent, type ChatOptions, type CreateSessionOptions, type DriverCapability, type DriverSession, type RunEvent, type RunStatus } from '../contract';
 import { parseSse } from './sse';
 
@@ -115,7 +116,7 @@ export class HermesDriver implements AgentDriver {
     }
     if (res.status === 401 || res.status === 403) {
       await res.body?.cancel();
-      throw new HermesError('chave do Hermes inválida (HABBLAUD_HERMES_KEY)');
+      throw new HermesError(tr('chave do Hermes inválida (HABBLAUD_HERMES_KEY)'));
     }
     return res;
   }
@@ -134,13 +135,13 @@ export class HermesDriver implements AgentDriver {
       if (res.ok) {
         const b = (await res.json()) as { id?: unknown; session?: { id?: unknown } };
         const id = b.session?.id ?? b.id;
-        if (!id) throw new HermesError('o Hermes não devolveu o id da sessão');
+        if (!id) throw new HermesError(tr('o Hermes não devolveu o id da sessão'));
         return { id: String(id), title };
       }
       const body: unknown = await res.json().catch(() => null);
       if (!titleInUse(res.status, body)) throw new HermesError(this.clean(`Hermes respondeu ${res.status}: ${JSON.stringify(body).slice(0, 200)}`));
     }
-    throw new HermesError(`nenhum título livre para "${opts.title}"`);
+    throw new HermesError(tr('nenhum título livre para "{0}"', [opts.title]));
   }
 
   async *chat(sessionId: string, message: string, signal: AbortSignal, opts: ChatOptions = {}): AsyncIterable<ChatEvent> {
@@ -148,7 +149,7 @@ export class HermesDriver implements AgentDriver {
     if (opts.system?.trim()) body.system_message = opts.system.trim();
     const res = await this.request('POST', `/api/sessions/${encodeURIComponent(sessionId)}/chat/stream`, body, signal);
     if (!res.ok) await this.fail(res);
-    if (!res.body) throw new HermesError('resposta do Hermes sem corpo');
+    if (!res.body) throw new HermesError(tr('resposta do Hermes sem corpo'));
     // Falha do run (ex.: modelo que o provedor não tem): o Hermes manda o motivo no assistant.completed com
     // completed=false e depois run.failed; vira um evento error com esse texto.
     let failedText: string | undefined;
@@ -179,7 +180,7 @@ export class HermesDriver implements AgentDriver {
     const res = await this.request('POST', '/v1/runs', body);
     if (!res.ok) await this.fail(res);
     const b = (await res.json().catch(() => ({}))) as { run_id?: unknown };
-    if (typeof b.run_id !== 'string' || !b.run_id) throw new HermesError('o Hermes não devolveu o id do run');
+    if (typeof b.run_id !== 'string' || !b.run_id) throw new HermesError(tr('o Hermes não devolveu o id do run'));
     return b.run_id;
   }
 
@@ -188,10 +189,10 @@ export class HermesDriver implements AgentDriver {
     const res = await this.request('GET', `/v1/runs/${encodeURIComponent(runId)}/events?last_seq=${seq}`, undefined, signal, { 'last-event-id': seq });
     if (res.status === 404) {
       await res.body?.cancel();
-      throw Object.assign(new HermesError('o Hermes não conhece mais este run'), { gone: true });
+      throw Object.assign(new HermesError(tr('o Hermes não conhece mais este run')), { gone: true });
     }
     if (!res.ok) await this.fail(res);
-    if (!res.body) throw new HermesError('resposta do Hermes sem corpo');
+    if (!res.body) throw new HermesError(tr('resposta do Hermes sem corpo'));
     for await (const f of parseSse(res.body)) {
       let p: Record<string, unknown>;
       try {
@@ -218,7 +219,7 @@ export class HermesDriver implements AgentDriver {
     const st = String(b.status ?? '');
     if (st === 'completed') return typeof b.output === 'string' ? { state: 'done', output: b.output } : { state: 'done' };
     if (st === 'failed') return { state: 'error', error: this.clean(typeof b.error === 'string' ? b.error : 'falha no Hermes') };
-    if (['cancelled', 'interrupted', 'stopped', 'expired'].includes(st)) return { state: 'error', error: 'interrompido' };
+    if (['cancelled', 'interrupted', 'stopped', 'expired'].includes(st)) return { state: 'error', error: tr('interrompido') };
     if (st === 'waiting_for_approval') return { state: 'waiting' };
     return { state: 'running' };
   }

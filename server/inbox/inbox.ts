@@ -93,8 +93,8 @@ export class Inbox {
 
   dismiss(id: string): void {
     const item = this.items().find((i) => i.id === id);
-    if (!item) throw new InboxError('unknown', 'item desconhecido');
-    if (item.kind === 'approval' || item.kind === 'permission') throw new InboxError('state', 'aprovações e pedidos saem ao responder');
+    if (!item) throw new InboxError('unknown', tr('item desconhecido'));
+    if (item.kind === 'approval' || item.kind === 'permission') throw new InboxError('state', tr('aprovações e pedidos saem ao responder'));
     this.dismissed.add(id);
     this.save();
   }
@@ -111,7 +111,7 @@ export class Inbox {
 
   async approve(id: string, choice: ApprovalChoice): Promise<void> {
     const item = this.items().find((i) => i.id === id);
-    if (!item || item.kind !== 'approval' || !item.runId) throw new InboxError('unknown', 'aprovação desconhecida');
+    if (!item || item.kind !== 'approval' || !item.runId) throw new InboxError('unknown', tr('aprovação desconhecida'));
     await this.opts.runs.approve(item.runId, choice);
   }
 

@@ -1,6 +1,7 @@
 // Conversa com uma ficha de agente: usa a sessão mais recente da ficha (cria uma se não houver) e manda as
 // instruções (contexto do projeto + instruções da ficha) a cada turno. Não depende de framework: só o contrato do
 // driver. Sessão nova pedida pelo usuário ("Nova conversa") vira a mais recente.
+import { tr } from '../../shared/i18n';
 import type { AgentDriver, ChatEvent } from '../drivers/contract';
 import type { Project } from '../projects/store';
 import type { RunManager } from '../runs/manager';
@@ -19,7 +20,7 @@ export class CardService {
 
   private card(id: string): AgentCard {
     const c = this.opts.cards.get(id);
-    if (!c) throw new AgentError('unknown', 'agente desconhecido');
+    if (!c) throw new AgentError('unknown', tr('agente desconhecido'));
     return c;
   }
 

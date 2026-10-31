@@ -8,6 +8,7 @@
 //   POST /api/cards/:id/sessions              abrir sessão nova (vira a mais recente)
 //   POST /api/cards/:id/messages {text}       conversar (SSE, mesmo formato do consultor)
 // Ler é livre; o resto exige a trava de acesso (loopback ou HABBLAUD_REMOTE_ALLOW=agents).
+import { tr } from '../../shared/i18n';
 import { RunError } from '../runs/manager';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readText, streamChat } from '../consult/http';
@@ -27,7 +28,7 @@ export interface CardRouteDeps {
 }
 
 function obj(b: unknown): Record<string, unknown> {
-  if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, 'esperado um objeto JSON');
+  if (!b || typeof b !== 'object' || Array.isArray(b)) throw new HttpError(400, tr('esperado um objeto JSON'));
   return b as Record<string, unknown>;
 }
 
@@ -39,7 +40,7 @@ function input(b: Record<string, unknown>): AgentInput {
 }
 
 function sessionOf(b: Record<string, unknown>): string {
-  if (typeof b.sessionId !== 'string' || !b.sessionId.trim()) throw new HttpError(400, 'esperado {sessionId}');
+  if (typeof b.sessionId !== 'string' || !b.sessionId.trim()) throw new HttpError(400, tr('esperado {sessionId}'));
   return b.sessionId.trim();
 }
 
@@ -55,7 +56,7 @@ function sendError(res: ServerResponse, err: unknown): void {
 function allow(req: IncomingMessage, res: ServerResponse, methods: string): void {
   req.resume();
   res.setHeader('Allow', methods);
-  sendJson(res, 405, { error: 'método não permitido' });
+  sendJson(res, 405, { error: tr('método não permitido') });
 }
 
 function notFound(req: IncomingMessage, res: ServerResponse, msg = 'rota desconhecida'): void {
@@ -71,7 +72,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
     const read = method === 'GET' || method === 'HEAD';
     if (!read && !allowed) {
       req.resume();
-      sendJson(res, 403, { error: 'fichas de agente não liberadas neste acesso' });
+      sendJson(res, 403, { error: tr('fichas de agente não liberadas neste acesso') });
       return true;
     }
     const run = (fn: () => Promise<void>) => void fn().catch((err) => sendError(res, err));
@@ -82,7 +83,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
         run(async () => {
           const b = obj(await readJson(req));
           if (b.fromConsult !== undefined) {
-            if (!deps.consult) throw new HttpError(404, 'consultor desligado');
+            if (!deps.consult) throw new HttpError(404, tr('consultor desligado'));
             if (typeof b.fromConsult !== 'string') throw new HttpError(400, 'fromConsult: id da consulta');
             const c = cards.create(input(b)); // valida antes de tirar a consulta do consultor
             try {
@@ -108,7 +109,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
       else if (method === 'DELETE')
         run(async () => {
           await readJson(req).catch(() => null);
-          if (!cards.remove(id)) throw new AgentError('unknown', 'agente desconhecido');
+          if (!cards.remove(id)) throw new AgentError('unknown', tr('agente desconhecido'));
           sendJson(res, 200, { ok: true });
         });
       else allow(req, res, 'GET, PATCH, DELETE');
@@ -126,7 +127,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
     else if (sub === 'release')
       run(async () => {
         const s = sessionOf(obj(await readJson(req)));
-        if (cards.bySession(s)?.id !== id) throw new AgentError('unknown', 'a sessão não é deste agente');
+        if (cards.bySession(s)?.id !== id) throw new AgentError('unknown', tr('a sessão não é deste agente'));
         cards.detachSession(s);
         sendJson(res, 200, cards.get(id));
       });
@@ -144,7 +145,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
         });
       else
         run(async () => {
-          if (!cards.get(id)) throw new AgentError('unknown', 'agente desconhecido');
+          if (!cards.get(id)) throw new AgentError('unknown', tr('agente desconhecido'));
           const text = await readText(req);
           await streamChat(res, (signal) => svc.chat(id, text, signal), (err) => err instanceof AgentError || err instanceof RunError);
         });

@@ -1,5 +1,6 @@
 // Consultas rápidas: uma sessão nova por consulta, contexto opcional só na primeira mensagem, arquivada sozinha
 // depois de um tempo sem uso. Não depende de framework: usa só o contrato do driver.
+import { tr } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type { RunManager } from '../runs/manager';
 import type { AgentDriver, ChatEvent } from '../drivers/contract';
@@ -71,7 +72,7 @@ export class ConsultService {
 
   private get(id: string): Entry {
     const e = this.entries.get(id);
-    if (!e) throw new ConsultError('consulta desconhecida', 'unknown');
+    if (!e) throw new ConsultError(tr('consulta desconhecida'), 'unknown');
     return e;
   }
 
@@ -82,7 +83,7 @@ export class ConsultService {
 
   async *send(id: string, text: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
     const e = this.get(id);
-    if (e.archived) throw new ConsultError('consulta arquivada', 'archived');
+    if (e.archived) throw new ConsultError(tr('consulta arquivada'), 'archived');
     const message = e.preamble ? `${e.preamble}\n\n${text}` : text;
     e.preamble = undefined;
     e.lastUsedAt = this.now();
@@ -101,7 +102,7 @@ export class ConsultService {
   /** Promover a agente: a consulta sai do consultor (não é mais arquivada sozinha) e devolve a sessão. */
   promote(id: string): string {
     const e = this.get(id);
-    if (e.archived) throw new ConsultError('consulta arquivada', 'archived');
+    if (e.archived) throw new ConsultError(tr('consulta arquivada'), 'archived');
     this.entries.delete(id);
     return e.sessionId;
   }

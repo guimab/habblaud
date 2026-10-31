@@ -87,8 +87,8 @@ export class RunManager {
   /** Inicia um turno na sessão do dono. Uma sessão só tem um run ativo por vez. */
   async start(owner: RunOwner, message: string, chat?: ChatOptions): Promise<string> {
     const d = this.opts.driver;
-    if (!d.startRun || !d.runEvents) throw new RunError('unsupported', 'o driver não suporta runs');
-    if (this.active(owner.sessionId)) throw new RunError('busy', 'agente ocupado: espere a resposta, redirecione ou pare');
+    if (!d.startRun || !d.runEvents) throw new RunError('unsupported', tr('o driver não suporta runs'));
+    if (this.active(owner.sessionId)) throw new RunError('busy', tr('agente ocupado: espere a resposta, redirecione ou pare'));
     const runId = await d.startRun(owner.sessionId, message, chat);
     const at = this.now();
     const live: Live = { rec: { runId, owner: { ...owner }, state: 'running', text: '', lastSeq: -1, startedAt: at, updatedAt: at }, buf: [], wake: new Set(), gen: 0 };
@@ -156,21 +156,21 @@ export class RunManager {
   async approve(runId: string, choice: ApprovalChoice): Promise<void> {
     const l = this.live(runId);
     const a = l.rec.approval;
-    if (l.rec.state !== 'waiting' || !a) throw new RunError('state', 'não há aprovação pendente neste run');
-    if (!a.choices.includes(choice)) throw new RunError('state', `escolha não aceita: ${choice}`);
-    if (!this.opts.driver.approve) throw new RunError('unsupported', 'o driver não suporta aprovação');
+    if (l.rec.state !== 'waiting' || !a) throw new RunError('state', tr('não há aprovação pendente neste run'));
+    if (!a.choices.includes(choice)) throw new RunError('state', tr('escolha não aceita: {0}', [choice]));
+    if (!this.opts.driver.approve) throw new RunError('unsupported', tr('o driver não suporta aprovação'));
     await this.opts.driver.approve(runId, choice, a.requestId);
   }
 
   async steer(runId: string, text: string): Promise<void> {
     const l = this.activeLive(runId);
-    if (!this.opts.driver.steer) throw new RunError('unsupported', 'o driver não suporta redirecionar');
+    if (!this.opts.driver.steer) throw new RunError('unsupported', tr('o driver não suporta redirecionar'));
     await this.opts.driver.steer(l.rec.runId, text);
   }
 
   async stop(runId: string): Promise<void> {
     const l = this.activeLive(runId);
-    if (!this.opts.driver.stop) throw new RunError('unsupported', 'o driver não suporta parar');
+    if (!this.opts.driver.stop) throw new RunError('unsupported', tr('o driver não suporta parar'));
     await this.opts.driver.stop(l.rec.runId);
   }
 
@@ -185,13 +185,13 @@ export class RunManager {
 
   private live(runId: string): Live {
     const l = this.runs.get(runId);
-    if (!l) throw new RunError('unknown', 'run desconhecido');
+    if (!l) throw new RunError('unknown', tr('run desconhecido'));
     return l;
   }
 
   private activeLive(runId: string): Live {
     const l = this.live(runId);
-    if (!ACTIVE.has(l.rec.state)) throw new RunError('state', 'o run já terminou');
+    if (!ACTIVE.has(l.rec.state)) throw new RunError('state', tr('o run já terminou'));
     return l;
   }
 

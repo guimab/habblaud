@@ -1,5 +1,6 @@
 // Rotas da Inbox (/api/inbox) e dos runs (/api/runs): listar, assinar a conversa de um run em andamento, redirecionar e
 // parar. Mudanças exigem a feature `agents` pela porta remota (mesmo `allowed` das fichas).
+import { tr } from '../../shared/i18n';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { CardRoute } from '../agents/http';
 import { readText, streamChat } from '../consult/http';
@@ -30,7 +31,7 @@ function sendError(res: ServerResponse, err: unknown): void {
 function allow(req: IncomingMessage, res: ServerResponse, methods: string): void {
   req.resume();
   res.setHeader('Allow', methods);
-  sendJson(res, 405, { error: 'método não permitido' });
+  sendJson(res, 405, { error: tr('método não permitido') });
 }
 
 function choiceOf(v: unknown): ApprovalChoice {
@@ -47,7 +48,7 @@ export function createInboxRoutes({ inbox, runs }: InboxRouteDeps): CardRoute {
     const read = method === 'GET' || method === 'HEAD';
     if (!read && !allowed) {
       req.resume();
-      sendJson(res, 403, { error: 'agentes não liberados neste acesso' });
+      sendJson(res, 403, { error: tr('agentes não liberados neste acesso') });
       return true;
     }
     const run = (fn: () => Promise<void>) => void fn().catch((err) => sendError(res, err));
@@ -71,7 +72,7 @@ export function createInboxRoutes({ inbox, runs }: InboxRouteDeps): CardRoute {
           });
       } else {
         req.resume();
-        sendJson(res, 404, { error: 'rota desconhecida' });
+        sendJson(res, 404, { error: tr('rota desconhecida') });
       }
       return true;
     }
@@ -88,7 +89,7 @@ export function createInboxRoutes({ inbox, runs }: InboxRouteDeps): CardRoute {
       else {
         const r = runs.get(id);
         if (r) sendJson(res, 200, view(r));
-        else sendJson(res, 404, { error: 'run desconhecido' });
+        else sendJson(res, 404, { error: tr('run desconhecido') });
       }
       return true;
     }
@@ -112,7 +113,7 @@ export function createInboxRoutes({ inbox, runs }: InboxRouteDeps): CardRoute {
       return true;
     }
     req.resume();
-    sendJson(res, 404, { error: 'rota desconhecida' });
+    sendJson(res, 404, { error: tr('rota desconhecida') });
     return true;
   };
 }
