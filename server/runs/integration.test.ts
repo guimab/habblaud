@@ -51,6 +51,19 @@ describe('runs nas conversas', () => {
     expect(mgr.get('run_1')).toMatchObject({ owner: { kind: 'card', id: c.id, sessionId: 'sess_Revisora', title: 'Revisora' }, state: 'done' });
   });
 
+  it('ficha em segundo plano (agenda): dispara o run marcado com a agenda, sem assinar', async () => {
+    const { d, runs } = driver();
+    const cards = new AgentStore(null, () => true);
+    const c = cards.create({ name: 'Vigia' });
+    const mgr = new RunManager({ driver: d, retryMs: 1 });
+    const svc = new CardService({ cards, driver: d, runs: mgr });
+    const runId = await svc.background(c.id, 'veja o cluster', 's_1');
+    expect(runId).toBe('run_1');
+    expect(runs[0]).toMatchObject({ session: 'sess_Vigia', text: 'veja o cluster' });
+    expect(mgr.get(runId)!.owner).toMatchObject({ kind: 'card', id: c.id, scheduleId: 's_1' });
+    await expect(svc.background(c.id, 'de novo')).rejects.toMatchObject({ code: 'busy' });
+  });
+
   it('consulta: abre run (preâmbulo só no primeiro turno) e não arquiva com run ativo', async () => {
     const { d, runs } = driver();
     const mgr = new RunManager({ driver: d, retryMs: 1 });

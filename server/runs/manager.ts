@@ -16,6 +16,8 @@ export interface RunOwner {
   id: string;
   sessionId: string;
   title?: string;
+  /** Run disparado por uma agenda (entrega 5). */
+  scheduleId?: string;
 }
 
 export interface RunRecord {

@@ -1861,6 +1861,9 @@ export const ES: Readonly<Record<string, string>> = {
   "escolha ao menos um dia da semana": "elige al menos un día de la semana",
   "horário inválido (HH:MM)": "hora inválida (HH:MM)",
   "agenda inválida: uma vez, a cada N minutos ou dias da semana": "agenda inválida: una vez, cada N minutos o días de la semana",
+  "agenda desconhecida": "agenda desconocida",
+  "escreva a mensagem da agenda": "escribe el mensaje de la agenda",
+  "mensagem longa demais (máx. {0} caracteres)": "mensaje demasiado largo (máx. {0} caracteres)",
   "Não consegui gravar {0}: {1}": "No pude guardar {0}: {1}",
 
   // server/permissions/codex.ts
