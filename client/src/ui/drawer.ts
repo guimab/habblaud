@@ -43,6 +43,7 @@ import { PermissionCard } from './permission';
 import { canRenameRoom } from './roomrename';
 import { ProjectSection } from './project';
 import { CardSection, NewCardRow } from './card';
+import { runPrompt, runReply, runsOfAgent, runStateLabel, type RunView } from './runs-model';
 import { pathsLabel } from './project-model';
 import { accountChipLabel, accountProvider, CODEX_LIVE_HINT, codexApprovalLabel, providerOf } from './provider';
 import { ptyControllable } from './ptyapi';
@@ -107,6 +108,29 @@ function updateTaskItem(li: HTMLElement, t: TaskItem, owner?: string): void {
   setHidden(ownerEl, !owner);
   setVariant(li, 'is-', t.status);
   setAttr(li, 'aria-label', `${t.title}: ${TASK_STATE[t.status]}`);
+}
+
+/**
+ * Item da lista de conversas do agente: estado, quando, o pedido e a resposta (ver ui/runs-model.ts).
+ * A hora é absoluta de propósito: a lista só é redesenhada quando os turnos mudam.
+ */
+function createRunItem(r: RunView): HTMLElement {
+  const ask = runPrompt(r);
+  const reply = runReply(r);
+  const item = h(
+    'li',
+    { class: `ui-run ui-run--${r.state}` },
+    h(
+      'div',
+      { class: 'ui-run__meta' },
+      h('span', { class: 'ui-run__state', text: runStateLabel(r.state) }),
+      h('time', { class: 'ui-run__when', text: formatClock(r.at), attrs: { datetime: new Date(r.at).toISOString() } }),
+    ),
+    h('p', { class: ask ? 'ui-run__ask' : 'ui-run__ask ui-muted', text: ask || tr('Registro antigo: o pedido não foi gravado.') }),
+    reply ? h('p', { class: 'ui-run__reply', text: reply }) : null,
+  );
+  setTitle(item, `${formatDateTime(r.at)} · ${runStateLabel(r.state)}${ask ? `\n${ask}` : ''}`);
+  return item;
 }
 
 function createTimelineItem(): HTMLElement {
@@ -259,6 +283,14 @@ class AgentView {
   private timelineSec: ReturnType<typeof section>;
   private timelineMore: HTMLButtonElement;
   private timelineLess: HTMLButtonElement;
+  /** Conversas do agente: os turnos que ele rodou, do mais recente ao mais antigo (GET /api/runs). */
+  private runsList: HTMLElement;
+  private runsEmpty: HTMLElement;
+  private runsSec: ReturnType<typeof section>;
+  private runs: RunView[] = [];
+  /** Chave do que está desenhado na lista de conversas (evita redesenhar a cada quadro). */
+  private runsKey = '';
+  private runsReq = 0;
   /** Quantos itens da linha do tempo aparecem agora. */
   private timelineShown = TIMELINE_STEP;
   private stats: KvList<StatKey>;
@@ -385,6 +417,9 @@ class AgentView {
     this.timelineMore = h('button', { class: 'ui-btn ui-btn--sm', type: 'button', on: { click: () => this.showTimeline(this.timelineShown + TIMELINE_STEP) } });
     this.timelineLess = h('button', { class: 'ui-btn ui-btn--sm', type: 'button', text: tr('Mostrar menos'), on: { click: () => this.showTimeline(TIMELINE_STEP) } });
     this.timelineSec = section(tr('Linha do tempo'), tl, h('div', { class: 'ui-timeline__more' }, this.timelineMore, this.timelineLess));
+    this.runsList = h('ul', { class: 'ui-runs' });
+    this.runsEmpty = h('p', { class: 'ui-muted ui-small', text: tr('Nenhuma conversa registrada ainda.') });
+    this.runsSec = section(tr('Conversas'), this.runsList, this.runsEmpty);
     this.timeline = new KeyedList<Activity>(tl, { key: (a) => a.id, create: createTimelineItem, update: (li, a) => updateTimelineItem(li, a, ctx.now()) });
 
     this.sessionValue = h('span', { class: 'ui-mono-inline' });
@@ -428,6 +463,7 @@ class AgentView {
       this.social.el,
       this.tasksSec.el,
       this.teamSec.el,
+      this.runsSec.el,
       this.timelineSec.el,
       statsSec.el,
       this.codexHint,
@@ -450,7 +486,29 @@ class AgentView {
     this.team.clear();
     this.shells.clear();
     this.actDetails.open = false;
+    this.runs = [];
+    this.runsKey = '';
     this.loadHistory();
+    this.loadRuns();
+  }
+
+  /** Turnos deste agente (GET /api/runs), com o pedido ao lado da resposta. */
+  private loadRuns(): void {
+    const id = this.id;
+    if (!id) return;
+    const req = ++this.runsReq;
+    this.ctx.store
+      .runs()
+      .then((all) => {
+        if (req !== this.runsReq) return;
+        const a = this.ctx.agent(id);
+        if (!a) return;
+        this.runs = runsOfAgent(all, a);
+        this.ctx.invalidate();
+      })
+      .catch(() => {
+        /* sem as conversas: a seção fica vazia, o resto da gaveta continua */
+      });
   }
 
   /** Histórico longo do agente (o pedido mais recente vale; ver historyGen). */
@@ -654,6 +712,17 @@ class AgentView {
       setText(this.teamEmpty, tr('O agente principal já não está no escritório.'));
       setHidden(this.teamEmpty, !!parent);
       this.team.sync(parent ? [parent] : []);
+    }
+
+    // Conversas deste agente: o pedido e a resposta de cada turno, para achar o que ele fez sem abrir o terminal.
+    const convs = this.runs;
+    setHidden(this.runsSec.el, convs.length === 0 && a.kind === 'sub');
+    setText(this.runsSec.extra, convs.length ? String(convs.length) : '');
+    setHidden(this.runsEmpty, convs.length > 0);
+    const runsKey = `${a.id}|${convs.map((r) => `${r.runId}:${r.state}:${r.at}`).join(',')}`;
+    if (this.runsKey !== runsKey) {
+      this.runsKey = runsKey;
+      this.runsList.replaceChildren(...convs.map(createRunItem));
     }
 
     // Linha do tempo (mais recente primeiro). No replay, nada depois do instante reproduzido.

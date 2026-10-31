@@ -17,6 +17,8 @@ export interface InboxItem {
   kind: InboxKind;
   /** Quem: nome da ficha/consulta ou do agente. */
   title: string;
+  /** Pedido que originou o turno (o que você pediu ao agente), quando o registro tem. */
+  prompt?: string;
   /** Resumo: comando a aprovar, fim da resposta ou motivo do erro. */
   text: string;
   at: number;
@@ -52,10 +54,18 @@ export interface InboxOptions {
 }
 
 const PREVIEW = 300;
+/** Quanto do pedido vai na Inbox (pedido longo é cortado no fim). */
+const PROMPT_PREVIEW = 240;
 
 function tail(text: string): string {
   const t = text.trim();
   return t.length > PREVIEW ? `…${t.slice(-PREVIEW)}` : t;
+}
+
+/** Início do texto, cortado com reticências (o pedido interessa pelo começo). */
+function head(text: string): string {
+  const t = text.trim();
+  return t.length > PROMPT_PREVIEW ? `${t.slice(0, PROMPT_PREVIEW).trimEnd()}…` : t;
 }
 
 /** A resposta termina pedindo algo ao usuário. */
@@ -74,7 +84,7 @@ export class Inbox {
     const out: InboxItem[] = [];
     for (const r of this.opts.runs.list()) {
       const id = `run:${r.runId}`;
-      const base = { id, title: r.owner.title || r.owner.id, at: r.updatedAt, runId: r.runId, owner: r.owner };
+      const base = { id, title: r.owner.title || r.owner.id, ...(r.prompt?.trim() ? { prompt: head(r.prompt) } : {}), at: r.updatedAt, runId: r.runId, owner: r.owner };
       if (r.state === 'waiting' && r.approval) out.push({ ...base, kind: 'approval', text: r.approval.command, approval: r.approval });
       if (this.dismissed.has(id) || r.seen) continue;
       if (r.state === 'done') out.push({ ...base, kind: asks(r.text) ? 'question' : 'reply', text: tail(r.text) });

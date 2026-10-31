@@ -26,7 +26,7 @@ describe('Inbox', () => {
   it('monta os itens: aprovação, pedido, pergunta, resposta, erro, interrompido; ignora ativos e vistos', () => {
     const { runs } = fakeRuns([
       rec({ runId: 'r1', state: 'waiting', approval: { command: 'rm x', description: 'apaga', choices: ['once', 'deny'] }, updatedAt: 10 }),
-      rec({ runId: 'r2', state: 'done', text: 'x'.repeat(500) + ' Posso seguir? ', updatedAt: 20 }),
+      rec({ runId: 'r2', state: 'done', text: 'x'.repeat(500) + ' Posso seguir? ', prompt: 'revise o README', updatedAt: 20 }),
       rec({ runId: 'r3', state: 'done', text: 'Pronto.', updatedAt: 30, owner: { kind: 'consult', id: 'k1', sessionId: 's2', title: 'Consulta' } }),
       rec({ runId: 'r4', state: 'error', error: 'quebrou', updatedAt: 40 }),
       rec({ runId: 'r5', state: 'interrupted', error: 'sumiu', updatedAt: 50 }),
@@ -46,6 +46,7 @@ describe('Inbox', () => {
     expect(items.find((i) => i.id === 'run:r1')).toMatchObject({ title: 'Revisora', text: 'rm x', runId: 'r1', owner: { kind: 'card', id: 'c1' }, approval: { choices: ['once', 'deny'] } });
     expect(items.find((i) => i.id === 'run:r2')!.text.length).toBeLessThanOrEqual(301);
     expect(items.find((i) => i.id === 'run:r2')!.text.endsWith('Posso seguir?')).toBe(true);
+    expect(items.find((i) => i.id === 'run:r2')!.prompt).toBe('revise o README');
     expect(items.find((i) => i.id === 'run:r4')!.text).toBe('quebrou');
     expect(items.find((i) => i.id === 'perm:p1')).toMatchObject({ title: 'Claude A', text: 'Rodar comando: npm test', permissionId: 'p1', agentId: 'agent-1', at: 5 });
     expect(inbox.count()).toBe(6);

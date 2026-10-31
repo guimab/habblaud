@@ -5,6 +5,7 @@
 // Também cuida da reconexão: quando o navegador desiste do stream (EventSource fechado após erro HTTP,
 // ex.: servidor reiniciando atrás de um proxy), tenta de novo com espera crescente.
 import type { AppearanceParts } from '../../../shared/appearance';
+import type { RunView } from '../ui/runs-model';
 import type { Activity, AgentDetail, AgentInfo, FeedItem, Notice, OfficeSnapshot, OutboxMessage, PermissionDecision, PermissionRequestInfo, RoomInfo } from '../../../shared/types';
 import { DemoSimulator } from '../../../shared/demo/simulator';
 import { tr } from '../../../shared/i18n';
@@ -173,6 +174,19 @@ export class OfficeStore {
     if (!res.ok) return this.agent(id)?.recent ?? [];
     const detail = (await res.json()) as AgentDetail;
     return detail.history;
+  }
+
+  /** Conversas dos agentes (GET /api/runs): turnos já rodados, com o pedido e a resposta (ver ui/runs-model.ts). */
+  async runs(): Promise<RunView[]> {
+    if (this.mock || this.replay) return [];
+    try {
+      const res = await fetch('/api/runs');
+      if (!res.ok) return [];
+      const data = (await res.json()) as { runs?: RunView[] };
+      return Array.isArray(data.runs) ? data.runs : [];
+    } catch {
+      return [];
+    }
   }
 
   /** Avisa o servidor que a conclusão deste agente já foi vista (tira o selo "concluiu" da lista). */

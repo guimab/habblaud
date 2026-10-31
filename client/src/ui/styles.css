@@ -7539,6 +7539,77 @@ html.is-replay #world {
   color: var(--st-waiting);
 }
 
+/* Conversas do agente na gaveta (ui/drawer.ts): um item por turno, com o pedido e a resposta. */
+.ui-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-run {
+  padding: 6px 8px;
+  border-left: 2px solid var(--st-done);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ui-text) 4%, transparent);
+}
+
+.ui-run--error,
+.ui-run--interrupted {
+  border-left-color: var(--st-waiting);
+}
+
+.ui-run--running,
+.ui-run--waiting {
+  border-left-color: var(--st-working);
+}
+
+.ui-run__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.ui-run__state {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.ui-run--error .ui-run__state,
+.ui-run--interrupted .ui-run__state {
+  color: var(--st-waiting);
+}
+
+.ui-run__when {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ui-muted);
+}
+
+.ui-run__ask {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ui-run__reply {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ui-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Pedido que originou a resposta, na Inbox. */
+.ui-inbox__ask {
+  margin: 4px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* ------------------------------------------------------------------ janelas móveis (ui/movable.ts) */
 
 .ui-move-handle {

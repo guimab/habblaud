@@ -8,6 +8,8 @@ export interface InboxItem {
   id: string;
   kind: InboxKind;
   title: string;
+  /** Pedido que originou o turno (o que você pediu ao agente). Ausente nos registros antigos. */
+  prompt?: string;
   text: string;
   at: number;
   runId?: string;

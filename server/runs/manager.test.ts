@@ -89,6 +89,16 @@ async function take(it: AsyncIterable<ChatEvent>, n = Infinity): Promise<ChatEve
 }
 
 describe('RunManager', () => {
+  it('guarda o pedido do turno: o registro diz o que originou a resposta', async () => {
+    const f = new FakeRuns();
+    const m = new RunManager({ driver: f.driver(), retryMs: 1 });
+    const id = await m.start(owner, 'revise o README');
+    expect(m.get(id)!.prompt).toBe('revise o README');
+    f.push(id, { type: 'delta', text: 'Feito', seq: 0 }, { type: 'done', seq: 1 });
+    await tick();
+    expect(m.get(id)).toMatchObject({ state: 'done', text: 'Feito', prompt: 'revise o README' });
+  });
+
   it('consome o run sem ninguém assistindo; quem chega depois recebe o histórico', async () => {
     const f = new FakeRuns();
     const m = new RunManager({ driver: f.driver(), retryMs: 1 });

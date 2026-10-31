@@ -24,6 +24,8 @@ export interface RunRecord {
   runId: string;
   owner: RunOwner;
   state: RunState;
+  /** O pedido que originou o turno (o texto mandado ao driver). Ausente nos registros antigos. */
+  prompt?: string;
   /** Texto da resposta acumulado. */
   text: string;
   /** Último seq recebido do framework (-1 = nenhum). */
@@ -101,7 +103,7 @@ export class RunManager {
       this.starting.delete(owner.sessionId);
     }
     const at = this.now();
-    const live: Live = { rec: { runId, owner: { ...owner }, state: 'running', text: '', lastSeq: -1, startedAt: at, updatedAt: at }, buf: [], wake: new Set(), gen: 0 };
+    const live: Live = { rec: { runId, owner: { ...owner }, state: 'running', prompt: message, text: '', lastSeq: -1, startedAt: at, updatedAt: at }, buf: [], wake: new Set(), gen: 0 };
     this.runs.set(runId, live);
     this.prune();
     this.changed(live, true);

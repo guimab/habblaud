@@ -213,6 +213,12 @@ export const ES: Readonly<Record<string, string>> = {
   // client/src/ui/drawer.ts
   "Copiado!": "¡Copiado!",
   "Não foi possível copiar": "No se pudo copiar",
+  // client/src/ui/drawer.ts e ui/inbox.ts (conversas del agente y el pedido que originó la respuesta)
+  "Conversas": "Conversaciones",
+  "Nenhuma conversa registrada ainda.": "Todavía no hay conversaciones registradas.",
+  "Registro antigo: o pedido não foi gravado.": "Registro antiguo: el pedido no se guardó.",
+  "Você pediu: {0}": "Pediste: {0}",
+  "Rodando": "Ejecutando",
   "concluída": "completada",
   "em andamento": "en curso",
   "Comando": "Comando",

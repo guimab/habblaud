@@ -18,6 +18,11 @@ do meio (0.**3**.0).
   quando você abre o agente, e a marca de "já vi" fica gravada no servidor (`<dataDir>/finished.json`): recarregar a
   página ou reiniciar o Habblaud não traz o selo de volta.
 
+- **O pedido fica gravado junto da resposta, e a gaveta do agente ganha a seção "Conversas".** Os turnos em segundo
+  plano passam a guardar o texto que os originou (`runs.json`), a Inbox mostra "Você pediu: …" acima da resposta, e a
+  gaveta lista as últimas conversas daquele agente — pedido, resposta, estado e hora — do mais recente ao mais antigo.
+  Turnos gravados antes disto aparecem sem o pedido ("Registro antigo: o pedido não foi gravado.").
+
 ## [1.0.3] - 2026-10-16
 
 ### Corrigido

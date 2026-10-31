@@ -196,6 +196,7 @@ export class InboxPanel {
       'div',
       { class: `ui-inbox__item ui-inbox__item--${item.kind}` },
       h('div', { class: 'ui-inbox__meta' }, h('strong', { text: item.owner?.scheduleId ? `⏰ ${item.title}` : item.title, title: item.owner?.scheduleId ? tr('Veio de uma agenda') : '' }), h('span', { class: 'ui-inbox__kind', text: kindLabel(item.kind) }), h('span', { class: 'ui-inbox__when', text: relativeTime(item.at, Date.now()) })),
+      item.prompt ? h('p', { class: 'ui-inbox__ask', text: tr('Você pediu: {0}', [item.prompt]) }) : '',
       item.text ? h(item.kind === 'approval' ? 'pre' : 'p', { class: item.kind === 'approval' ? 'ui-consult__command' : 'ui-inbox__text', text: item.text }) : '',
       h('div', { class: 'ui-consult__actions' }, ...actions),
     );
