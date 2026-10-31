@@ -74,6 +74,8 @@ export interface ApiDeps {
   projects?: ProjectRoute;
   /** Fichas de agente (/api/cards). */
   cards?: CardRoute;
+  /** Inbox e runs em segundo plano (/api/inbox, /api/runs); mudanças pedem a feature `agents`. */
+  inbox?: CardRoute;
   /** Pastas sugeridas no "Novo agente" (GET /api/spawn/folders; spawn/folders.ts): projetos recentes. */
   spawnFolders?: () => Promise<SpawnFolder[]>;
   /** Anexos do "Novo agente" (POST /api/spawn/attachments; spawn/attachments.ts). */
@@ -501,6 +503,12 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
       return true;
     }
     if (deps.cards && (path === '/api/cards' || path.startsWith('/api/cards/'))) return deps.cards(req, res, path, method, trusted(req, 'agents'));
+    if (path === '/api/inbox' || path.startsWith('/api/inbox/') || path === '/api/runs' || path.startsWith('/api/runs/')) {
+      if (deps.inbox) return deps.inbox(req, res, path, method, trusted(req, 'agents'));
+      req.resume();
+      sendJson(res, 404, { error: 'inbox desligada (sem driver configurado)' });
+      return true;
+    }
     if (deps.projects && (path === '/api/projects' || path.startsWith('/api/projects/'))) return deps.projects(req, res, path, method, trusted(req, 'projects'));
     if (path === '/api/consult' || path.startsWith('/api/consult/')) {
       if (!deps.consult) {

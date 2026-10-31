@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { codexDirsRefused, isDefaultDir } from './accounts/detect';
 import { AccountsService } from './accounts/service';
 import { RunManager } from './runs/manager';
+import { Inbox } from './inbox/inbox';
+import { createInboxRoutes } from './inbox/http';
 import { HermesDriver } from './drivers/hermes/client';
 import { createConsultRoutes } from './consult/http';
 import { ConsultService } from './consult/service';
@@ -367,6 +369,14 @@ const hermesDriver = config.hermes ? new HermesDriver({ baseUrl: config.hermes.b
 // Runs em segundo plano: o turno continua no Hermes com o painel fechado; retomados ao reiniciar.
 const runs = hermesDriver ? new RunManager({ driver: hermesDriver, file: join(config.dataDir, 'runs.json') }) : undefined;
 runs?.resume();
+const inbox = runs
+  ? new Inbox({
+      runs,
+      permissions: () => late.permissions?.snapshot() ?? new Map(),
+      agentName: (id) => hub.current().agents.find((a) => a.id === id)?.name,
+      file: join(config.dataDir, 'inbox.json'),
+    })
+  : undefined;
 const consult = hermesDriver ? new ConsultService({ driver: hermesDriver, ...(runs ? { runs } : {}) }) : undefined;
 if (consult) {
   setInterval(() => void consult.sweep().catch(() => {}), 60_000).unref();
@@ -376,6 +386,7 @@ if (consult) {
 const api = createApiHandler({
   consult: consult ? createConsultRoutes(consult) : undefined,
   projects: createProjectRoutes(projects),
+  ...(runs && inbox ? { inbox: createInboxRoutes({ inbox, runs }) } : {}),
   cards: createCardRoutes({ cards: agentCards, ...(hermesDriver ? { service: new CardService({ cards: agentCards, driver: hermesDriver, projects, ...(runs ? { runs } : {}) }) } : {}), ...(consult ? { consult } : {}) }),
   renameRoom: (id, name) => {
     if (id.startsWith('project:')) {

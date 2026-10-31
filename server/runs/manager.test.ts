@@ -103,6 +103,7 @@ describe('RunManager', () => {
       { type: 'delta', text: 'mundo' },
       { type: 'done' },
     ]);
+    expect(m.get(id)!.seen).toBe(true);
   });
 
   it('assinante recebe o que já houve e o que vier; desassinar não para o run', async () => {

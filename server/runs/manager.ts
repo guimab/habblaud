@@ -30,6 +30,8 @@ export interface RunRecord {
   updatedAt: number;
   approval?: ApprovalRequest;
   error?: string;
+  /** Alguém acompanhou o run até o fim (a resposta não vai para a Inbox). */
+  seen?: boolean;
 }
 
 export class RunError extends Error {
@@ -130,7 +132,13 @@ export class RunManager {
       while (i < l.buf.length) {
         const e = l.buf[i++]!;
         yield e;
-        if (e.type === 'done') return;
+        if (e.type === 'done') {
+          if (!l.rec.seen) {
+            l.rec.seen = true;
+            this.changed(l, true);
+          }
+          return;
+        }
       }
       if (signal.aborted || !ACTIVE.has(l.rec.state)) return;
       await new Promise<void>((resolve) => {
