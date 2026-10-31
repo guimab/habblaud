@@ -1864,6 +1864,7 @@ export const ES: Readonly<Record<string, string>> = {
   "agenda desconhecida": "agenda desconocida",
   "escreva a mensagem da agenda": "escribe el mensaje de la agenda",
   "mensagem longa demais (máx. {0} caracteres)": "mensaje demasiado largo (máx. {0} caracteres)",
+  "agendas desligadas (sem driver configurado)": "agendas desactivadas (sin driver configurado)",
   "Não consegui gravar {0}: {1}": "No pude guardar {0}: {1}",
 
   // server/permissions/codex.ts

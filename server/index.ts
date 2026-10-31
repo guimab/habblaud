@@ -2,6 +2,8 @@
 // mantém o modelo do escritório e transmite via SSE. Sem dependências de runtime.
 //   npm run dev    -> tsx server/index.ts --dev (Vite em middleware mode, HMR no mesmo servidor)
 //   npm start      -> node dist/server/index.js (serve dist/client)
+import { createScheduleRoutes } from './schedule/http';
+import { Scheduler } from './schedule/scheduler';
 import http from 'node:http';
 import { join } from 'node:path';
 import { codexDirsRefused, isDefaultDir } from './accounts/detect';
@@ -377,6 +379,17 @@ const inbox = runs
       file: join(config.dataDir, 'inbox.json'),
     })
   : undefined;
+const cardService = hermesDriver ? new CardService({ cards: agentCards, driver: hermesDriver, projects, ...(runs ? { runs } : {}) }) : undefined;
+// Agendas: na hora marcada a ficha trabalha sozinha (run em segundo plano; a resposta vai para a Inbox).
+const scheduler =
+  cardService && runs
+    ? new Scheduler({
+        start: (cardId, text, scheduleId) => cardService.background(cardId, text, scheduleId),
+        cardExists: (id) => !!agentCards.get(id),
+        file: join(config.dataDir, 'schedules.json'),
+      })
+    : undefined;
+if (scheduler) agentCards.onChange(() => scheduler.prune());
 const consult = hermesDriver ? new ConsultService({ driver: hermesDriver, ...(runs ? { runs } : {}) }) : undefined;
 if (consult) {
   setInterval(() => void consult.sweep().catch(() => {}), 60_000).unref();
@@ -387,7 +400,8 @@ const api = createApiHandler({
   consult: consult ? createConsultRoutes(consult) : undefined,
   projects: createProjectRoutes(projects),
   ...(runs && inbox ? { inbox: createInboxRoutes({ inbox, runs }) } : {}),
-  cards: createCardRoutes({ cards: agentCards, ...(hermesDriver ? { service: new CardService({ cards: agentCards, driver: hermesDriver, projects, ...(runs ? { runs } : {}) }) } : {}), ...(consult ? { consult } : {}) }),
+  ...(scheduler ? { schedules: createScheduleRoutes(scheduler) } : {}),
+  cards: createCardRoutes({ cards: agentCards, ...(cardService ? { service: cardService } : {}), ...(consult ? { consult } : {}) }),
   renameRoom: (id, name) => {
     if (id.startsWith('project:')) {
       try {
@@ -613,6 +627,7 @@ function shutdown(signal: string): void {
   updates.stop();
   worldViewer?.stop();
   worldUplink?.stop();
+  scheduler?.close();
   runs?.close();
   world?.stop();
   names.flush();

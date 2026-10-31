@@ -1725,6 +1725,7 @@ export const FR: Readonly<Record<string, string>> = {
   "agenda desconhecida": "planification inconnue",
   "escreva a mensagem da agenda": "écrivez le message de la planification",
   "mensagem longa demais (máx. {0} caracteres)": "message trop long (max. {0} caractères)",
+  "agendas desligadas (sem driver configurado)": "planifications désactivées (aucun pilote configuré)",
   "Não consegui gravar {0}: {1}": "Impossible d'écrire {0} : {1}",
 
   // server/permissions/codex.ts
