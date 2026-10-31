@@ -150,6 +150,6 @@ describe('HermesDriver', () => {
   });
 
   it('capacidades desta entrega', async () => {
-    expect([...(await new HermesDriver({ baseUrl: 'http://x', key: 'k' }).capabilities())].sort()).toEqual(['chat', 'create']);
+    expect([...(await new HermesDriver({ baseUrl: 'http://x', key: 'k' }).capabilities())].sort()).toEqual(['approve', 'chat', 'create', 'steer', 'stop']);
   });
 });
