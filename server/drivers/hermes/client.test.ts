@@ -101,6 +101,26 @@ describe('HermesDriver', () => {
     ]);
   });
 
+  it('run.failed vira evento error com o texto da resposta que falhou (ex.: modelo inexistente)', async () => {
+    const { base } = await fake((_r, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.end('event: assistant.completed\ndata: {"content":"Model x not found","completed":false}\n\nevent: run.failed\ndata: {"completed":false}\n\nevent: done\ndata: {}\n\n');
+    });
+    const evs: ChatEvent[] = [];
+    for await (const e of new HermesDriver({ baseUrl: base, key: 'k' }).chat('s', 'x', new AbortController().signal)) evs.push(e);
+    expect(evs).toEqual([{ type: 'error', message: 'Model x not found' }, { type: 'done' }]);
+  });
+
+  it('run.failed sem texto: mensagem genérica', async () => {
+    const { base } = await fake((_r, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.end('event: run.failed\ndata: {}\n\n');
+    });
+    const evs: ChatEvent[] = [];
+    for await (const e of new HermesDriver({ baseUrl: base, key: 'k' }).chat('s', 'x', new AbortController().signal)) evs.push(e);
+    expect(evs).toEqual([{ type: 'error', message: 'o Hermes não concluiu a resposta' }]);
+  });
+
   it('erro no stream vira evento error', async () => {
     const { base } = await fake((_r, res) => {
       res.writeHead(200, { 'content-type': 'text/event-stream' });

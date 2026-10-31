@@ -114,7 +114,24 @@ export class HermesDriver implements AgentDriver {
     const res = await this.request('POST', `/api/sessions/${encodeURIComponent(sessionId)}/chat/stream`, body, signal);
     if (!res.ok) await this.fail(res);
     if (!res.body) throw new HermesError('resposta do Hermes sem corpo');
+    // Falha do run (ex.: modelo que o provedor não tem): o Hermes manda o motivo no assistant.completed com
+    // completed=false e depois run.failed; vira um evento error com esse texto.
+    let failedText: string | undefined;
     for await (const f of parseSse(res.body)) {
+      if (f.event === 'assistant.completed' || f.event === 'run.failed') {
+        let p: { content?: unknown; completed?: unknown; error?: unknown } = {};
+        try {
+          p = JSON.parse(f.data) as typeof p;
+        } catch {
+          /* sem JSON */
+        }
+        if (f.event === 'assistant.completed') {
+          if (p.completed === false && typeof p.content === 'string' && p.content.trim()) failedText = p.content.trim();
+          continue;
+        }
+        yield { type: 'error', message: this.clean(failedText ?? ((typeof p.error === 'string' && p.error) || 'o Hermes não concluiu a resposta')) };
+        continue;
+      }
       const e = mapEvent(f.event, f.data);
       if (e?.type === 'error' && e.message) e.message = this.clean(e.message);
       if (e) yield e;
