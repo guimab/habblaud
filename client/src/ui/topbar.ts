@@ -24,10 +24,11 @@ interface CounterRefs {
 /** Contadores fixos (o de shells é à parte: só aparece quando há shells rodando). */
 const COUNTERS: { key: Exclude<keyof Counters, 'shells'>; singular: string; plural: string; hint: string }[] = [
   { key: 'rooms', singular: tr('sala'), plural: tr('salas'), hint: tr('Salas abertas (uma por projeto)') },
-  { key: 'agents', singular: tr('agente'), plural: tr('agentes'), hint: tr('Agentes no escritório (principais e subagentes)') },
-  { key: 'working', singular: tr('trabalhando'), plural: tr('trabalhando'), hint: tr('Agentes processando um pedido agora') },
+  // O rótulo diz o que é contado: cada personagem no escritório é uma sessão aberta (com ou sem ficha).
+  { key: 'agents', singular: tr('sessão'), plural: tr('sessões'), hint: tr('Sessões abertas no escritório (principais e subagentes)') },
+  { key: 'working', singular: tr('trabalhando'), plural: tr('trabalhando'), hint: tr('Sessões processando um pedido agora') },
   { key: 'subagents', singular: tr('subagente'), plural: tr('subagentes'), hint: tr('Subagentes em atividade') },
-  { key: 'waiting', singular: tr('precisa de você'), plural: tr('precisam de você'), hint: tr('Agentes esperando sua resposta no terminal') },
+  { key: 'waiting', singular: tr('precisa de você'), plural: tr('precisam de você'), hint: tr('Sessões esperando sua resposta no terminal') },
 ];
 const WAITING_HINT = COUNTERS.find((c) => c.key === 'waiting')!.hint;
 

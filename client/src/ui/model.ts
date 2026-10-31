@@ -17,6 +17,29 @@ export const STATUS_LABEL: Record<AgentStatus, string> = {
 /** Ordem de urgência (menor = mais urgente), usada para destacar quem precisa de atenção. */
 const STATUS_URGENCY: Record<AgentStatus, number> = { waiting: 0, shell: 1, working: 2, idle: 3, done: 4, offline: 5, sleeping: 6 };
 
+/**
+ * Legenda de cada estado (a Ajuda mostra o rótulo + este texto). A ordem é a de exibição.
+ * Ocioso e dormindo são estados diferentes e a legenda diz isso: ocioso = sessão aberta sem turno;
+ * dormindo = ficha sem sessão aberta (vocabulário em docs/superpowers/specs/2026-10-30-habblaud-hermes-design.md).
+ */
+export const STATUS_HELP: [AgentStatus, string][] = [
+  ['working', tr('Na mesa, digitando: está processando um pedido.')],
+  ['waiting', tr('Mão levantada: espera uma resposta sua no terminal (permissão, pergunta ou escolha).')],
+  ['shell', tr('Ampulheta sobre a cabeça: terminou o turno e fica na mesa esperando um shell terminar.')],
+  [
+    'idle',
+    tr(
+      'Sessão aberta e sem turno em andamento: o turno terminou e nada roda agora — não é "sem trabalho" (pode haver trabalho à espera de um pedido). Circula pelo escritório até a próxima instrução.',
+    ),
+  ],
+  [
+    'sleeping',
+    tr('A ficha existe, mas não há sessão aberta: dorme na sala do projeto até alguém chamar — diferente de ocioso, que tem sessão aberta.'),
+  ],
+  ['done', tr('Subagente que concluiu: entrega o resultado e vai embora.')],
+  ['offline', tr('A sessão foi fechada: o personagem vai até o elevador e sai.')],
+];
+
 export function statusLabel(status: AgentStatus): string {
   return STATUS_LABEL[status];
 }

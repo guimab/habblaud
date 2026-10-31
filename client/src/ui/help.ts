@@ -1,22 +1,12 @@
 // Ajuda ("?"): legenda de status e ícones, controles, o que o escritório mostra, contas e uso, e o Codex.
-import type { AgentStatus } from '../../../shared/types';
 import type { HelpSection } from './context';
 import { h, iconButton, prefersReducedMotion } from './dom';
 import { ICONS } from './icons';
-import { SHELL_STAGES, STATUS_LABEL } from './model';
+import { SHELL_STAGES, STATUS_HELP, STATUS_LABEL } from './model';
 import { CODEX_LIVE_HINT } from './provider';
 import { createUsageSetup, richText } from './usage';
 import { createAccountChip, updateAccountChip } from './widgets';
 import { tr } from '../../../shared/i18n';
-
-const STATUS_HELP: [AgentStatus, string][] = [
-  ['working', tr('Na mesa, digitando: está processando um pedido.')],
-  ['waiting', tr('Mão levantada: espera uma resposta sua no terminal (permissão, pergunta ou escolha).')],
-  ['shell', tr('Ampulheta sobre a cabeça: terminou o turno e fica na mesa esperando um shell terminar.')],
-  ['idle', tr('Terminou o turno e circula pelo escritório até a próxima instrução.')],
-  ['done', tr('Subagente que concluiu: entrega o resultado e vai embora.')],
-  ['offline', tr('A sessão foi fechada: o personagem vai até o elevador e sai.')],
-];
 
 const ICON_HELP: [string, string][] = [
   ['📨', tr('Recebeu um pedido')],

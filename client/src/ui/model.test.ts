@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AccountInfo, AgentInfo, RoomInfo, ShellJob } from '../../../shared/types';
+import type { AccountInfo, AgentInfo, AgentStatus, RoomInfo, ShellJob } from '../../../shared/types';
 import {
   accountsOf,
   activityFallback,
@@ -23,6 +23,8 @@ import {
   shellWaitingAgents,
   shortcutHint,
   sortByUrgency,
+  STATUS_HELP,
+  STATUS_LABEL,
   statusLabel,
   visibleShells,
   waitingAgents,
@@ -252,6 +254,26 @@ describe('shellWait', () => {
     expect(displayStatus({ status: 'working', statusSince: 0, shells: [] }, NOW)).toBe('working');
     expect(displayStatus({ status: 'shell', statusSince: 0 }, NOW)).toBe('shell');
     expect(statusLabel('shell')).toBe('Esperando o shell');
+  });
+});
+
+describe('legenda dos estados (Ajuda)', () => {
+  it('tem uma linha por estado, sem faltar nem repetir', () => {
+    const estados = STATUS_HELP.map(([s]) => s);
+    expect(new Set(estados).size).toBe(estados.length);
+    for (const s of Object.keys(STATUS_LABEL) as AgentStatus[]) {
+      expect(estados, s).toContain(s);
+      expect(STATUS_HELP.find(([k]) => k === s)![1].trim(), s).not.toBe('');
+    }
+  });
+  it('explica ocioso e dormindo como coisas diferentes (vocabulário)', () => {
+    const texto = (s: AgentStatus) => STATUS_HELP.find(([k]) => k === s)![1].toLowerCase();
+    // Ocioso = sessão aberta sem turno, e a legenda diz que não é "sem trabalho".
+    expect(texto('idle')).toContain('sessão');
+    expect(texto('idle')).toContain('sem trabalho');
+    // Dormindo = ficha sem sessão aberta, e a legenda contrasta com ocioso.
+    expect(texto('sleeping')).toContain('não há sessão aberta');
+    expect(texto('sleeping')).toContain('ocioso');
   });
 });
 
