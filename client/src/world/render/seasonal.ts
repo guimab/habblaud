@@ -4,10 +4,9 @@ import { hash32 } from '../../../../shared/hash';
 import { renderSeasonalProp, type SeasonalProp } from '../../art/seasonal';
 import type { SeasonalTheme } from '../api';
 import type { AreaLayout, WallSegment } from '../layout/types';
+import { CYBER, billboardBars, holoScanlines, neonFlicker, rainDrops } from './cyber';
 
 const sprites = new Map<SeasonalProp, Sprite>();
-/** Paleta do tema cyberpunk: parede escura, neon amarelo (Night City) com emendas ciano e magenta. */
-const CYBER = { wall: '#191d29', floor: '#20263a', carpet: '#242b45', neon: '#fcee0a', cold: '#00e5ff' } as const;
 function prop(kind: SeasonalProp): Sprite {
   let sprite = sprites.get(kind);
   if (!sprite) {
@@ -156,9 +155,24 @@ export function decorateSeasonalWall(ctx: CanvasRenderingContext2D, theme: Seaso
   ctx.restore();
 }
 
-/** Guirlandas nas molduras dos elevadores (sem cobrir a porta animada). */
-export function decorateElevator(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, x: number, y: number): void {
-  if (theme === 'none' || theme === 'cyberpunk') return;
+/** Guirlandas nas molduras dos elevadores (sem cobrir a porta animada). No cyberpunk, o painel holográfico. */
+export function decorateElevator(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, x: number, y: number, now = 0, seed = 0): void {
+  if (theme === 'none') return;
+  if (theme === 'cyberpunk') {
+    const w = 14, h = 9;
+    const px = Math.round(x - w / 2), py = Math.round(y - 20 - h);
+    ctx.save();
+    ctx.globalAlpha = 0.8 * neonFlicker(now, seed);
+    ctx.fillStyle = '#0d1b24';
+    ctx.fillRect(px, py, w, h);
+    ctx.fillStyle = CYBER.cold;
+    ctx.fillRect(px, py, w, 1);
+    ctx.fillRect(px, py + h - 1, w, 1);
+    ctx.fillStyle = '#7ef0ff';
+    for (const line of holoScanlines(h, now, seed)) ctx.fillRect(px + 2, py + 1 + line, w - 4, 1);
+    ctx.restore();
+    return;
+  }
   const sprite = prop(theme === 'christmas' ? 'wreath' : 'bat');
   ctx.drawImage(sprite.canvas, Math.round(x - sprite.ax), Math.round(y - 19 - sprite.ay));
 }
@@ -182,7 +196,7 @@ function glowSprite(theme: SeasonalTheme): HTMLCanvasElement {
 }
 
 /** Luz decorativa suave, limitada à face da parede. Não interfere com salas apagadas. */
-export function drawSeasonalLights(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, layout: AreaLayout, light: number): void {
+export function drawSeasonalLights(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, layout: AreaLayout, light: number, now = 0): void {
   if (theme === 'none' || light <= 0.01) return;
   ctx.save();
   for (const wall of layout.walls) {
@@ -191,11 +205,12 @@ export function drawSeasonalLights(ctx: CanvasRenderingContext2D, theme: Seasona
     ctx.beginPath();
     ctx.rect(wall.x, wall.y + 4, wall.w, 27);
     ctx.clip();
+    const flick = theme === 'cyberpunk' ? neonFlicker(now, Math.round(wall.x)) : 1;
     for (let x = wall.x + 14; x < wall.x + wall.w - 6; x += 24) {
       if (wall.doorways?.some((d) => x >= d.x - 10 && x <= d.x + d.w + 10)) continue;
-      ctx.globalAlpha = light * 0.3;
+      ctx.globalAlpha = light * 0.3 * flick;
       ctx.drawImage(glowSprite(theme), Math.round(x - 17), wall.y - 8);
-      ctx.globalAlpha = light * 0.85;
+      ctx.globalAlpha = light * 0.85 * flick;
       ctx.fillStyle = theme === 'cyberpunk' ? CYBER.cold : theme === 'christmas' ? '#ffe4a9' : '#ffd181';
       ctx.fillRect(Math.round(x), wall.y + 9, 2, 2);
     }
@@ -205,6 +220,26 @@ export function drawSeasonalLights(ctx: CanvasRenderingContext2D, theme: Seasona
 }
 
 export function drawSeasonalWindow(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, glass: { x: number; y: number; w: number; h: number }, now: number, seed: number): void {
+  if (theme === 'cyberpunk') {
+    // Noite de Night City: o vidro escurece, chove lá fora e um letreiro de neon se reflete no vidro.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(glass.x, glass.y, glass.w, glass.h);
+    ctx.clip();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#0c1424';
+    ctx.fillRect(glass.x, glass.y, glass.w, glass.h);
+    billboardBars(glass, seed).forEach((b, i) => {
+      ctx.globalAlpha = 0.6 * neonFlicker(now, seed + i * 13);
+      ctx.fillStyle = b.color;
+      ctx.fillRect(Math.round(glass.x + b.x), Math.round(glass.y + b.y), b.w, b.h);
+    });
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#cbe8ff';
+    for (const d of rainDrops(glass, now, seed)) ctx.fillRect(Math.floor(glass.x + d.x), Math.floor(glass.y + d.y), 2, d.len);
+    ctx.restore();
+    return;
+  }
   if (theme !== 'christmas') return;
   ctx.save();
   ctx.beginPath();

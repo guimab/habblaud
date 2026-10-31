@@ -501,7 +501,7 @@ export class Renderer {
       for (const vis of this.areas.values()) {
         if (vis.room && vis.room.phase !== 'ready') continue;
         if (!visible(vis.px.x, vis.px.y, vis.px.w, vis.px.h)) continue;
-        drawSeasonalLights(ctx, this.theme, vis.layout, vis.room ? vis.room.light(now) : 1);
+        drawSeasonalLights(ctx, this.theme, vis.layout, vis.room ? vis.room.light(now) : 1, now);
       }
     }
     // giroflex e balão "!" do alarme de CI (brilham também no escuro)
@@ -595,7 +595,7 @@ export class Renderer {
         if (!s) return;
         const o = wallItemOrigin(w, s.base);
         ctx.drawImage(s.base.canvas, o.x, o.y + rise);
-        decorateElevator(ctx, this.theme, w.cx, w.baseY + rise);
+        decorateElevator(ctx, this.theme, w.cx, w.baseY + rise, now, w.seed);
         return;
       }
       case 'light_switch': {
@@ -667,7 +667,15 @@ export class Renderer {
     }
     ctx.globalAlpha *= alpha;
     this.safe(() => this.art.drawWindowView(ctx, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, hour, now, w.seed));
-    drawSeasonalWindow(ctx, this.theme, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, now, w.seed);
+    const glassRect = { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h };
+    if (this.theme === 'cyberpunk') {
+      // O tema vai POR CIMA do sprite: o vidro do sprite é translúcido e matiza o que está embaixo, e a chuva e o
+      // letreiro ficavam apagados. Os sazonais seguem por baixo, como sempre foram.
+      ctx.drawImage(s.base.canvas, o.x, o.y + rise);
+      drawSeasonalWindow(ctx, this.theme, glassRect, now, w.seed);
+      return;
+    }
+    drawSeasonalWindow(ctx, this.theme, glassRect, now, w.seed);
     ctx.drawImage(s.base.canvas, o.x, o.y + rise);
   }
 
