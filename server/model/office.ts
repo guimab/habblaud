@@ -31,6 +31,7 @@ import { hash32 } from '../../shared/hash';
 import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
 import { normalizeCwd, roomDisplayNames, SlotAllocator } from './rooms';
+import type { Project } from '../projects/store';
 import { tr } from '../../shared/i18n';
 import type { WorldMeta } from '../../shared/world/api';
 
@@ -56,6 +57,8 @@ export interface OfficeDeps {
   names: NameStore;
   /** Nome escolhido pelo usuário para a sala da pasta (model/room-aliases.ts), se houver. */
   roomAlias?: (path: string) => string | undefined;
+  /** Projetos (projects/store.ts): agente em pasta de projeto vai para a sala do projeto. */
+  projects?: { match(cwd: string): Project | undefined; get(id: string): Project | undefined };
   version: string;
   /** Build do cliente servido (ver OfficeSnapshot.meta.build); ausente no modo dev e nos testes. */
   build?: () => string | undefined;
@@ -200,7 +203,7 @@ const byStart = (a: ShellJob, b: ShellJob) => a.startedAt - b.startedAt || a.id.
 
 export class Office {
   private agents = new Map<string, AgentRecord>();
-  private rooms = new Map<string, { path: string; createdAt: number }>();
+  private rooms = new Map<string, { path: string; createdAt: number; project?: string; paths?: string[] }>();
   private slots = new SlotAllocator(SLOT_COOLDOWN_MS);
   private roomNames = new Map<string, string>();
   private feed: FeedItem[] = [];
@@ -326,7 +329,7 @@ export class Office {
       this.setStatus(p.id, p.status, p.waitingFor);
       return;
     }
-    const roomId = normalizeCwd(p.cwd);
+    const roomId = this.roomFor(p.cwd);
     this.ensureRoom(roomId, now);
     const chosen = this.roomCharacter(roomId, p.id, p.sessionId);
     // A mesma sessão retomada noutro processo (ex.: "Assumir aqui") mantém o nome, mesmo com o processo antigo
@@ -336,6 +339,7 @@ export class Office {
       id: p.id,
       kind: 'main',
       roomId,
+      cwd: p.cwd,
       name: person.name,
       look: person.look,
       role: p.role,
@@ -599,6 +603,7 @@ export class Office {
       kind: 'sub',
       parentId: p.parentId,
       roomId: parent.info.roomId,
+      ...(parent.info.cwd ? { cwd: parent.info.cwd } : {}),
       name: person.name,
       look: person.look,
       role: p.role,
@@ -932,12 +937,7 @@ export class Office {
     }
     // festa acabou / alarme expirou: o snapshot sai sem o efeito
     if (this.effects.prune(now)) this.markDirty();
-    if (removed) {
-      const occupied = new Set([...this.agents.values()].map((r) => r.info.roomId));
-      for (const id of [...this.rooms.keys()]) if (!occupied.has(id)) this.rooms.delete(id);
-      this.recomputeRoomNames();
-      this.markDirty();
-    }
+    if (removed) this.dropEmptyRooms();
   }
 
   /** Fecha uma revisão: devolve o snapshot (novo, se algo mudou), o feed e os avisos pendentes. */
@@ -959,12 +959,14 @@ export class Office {
     const now = this.now();
     const entries = new Map(this.rooms);
     for (const r of this.demoSnap?.rooms ?? []) entries.set(r.id, { path: r.path, createdAt: r.createdAt });
+    this.syncProjectRooms();
     this.slots.sync(entries.keys(), now);
     const rooms: RoomInfo[] = [...entries]
       .map(([id, r]) => ({
         id,
         name: this.roomName(id),
         path: r.path,
+        ...(r.project ? { project: r.project, paths: [...(r.paths ?? [])] } : {}),
         slot: this.slots.slotOf(id) ?? 0,
         seed: hash32(id),
         createdAt: r.createdAt,
@@ -1044,9 +1046,51 @@ export class Office {
     return out;
   }
 
+  /** Sala de um cwd: a do projeto que contém a pasta, ou a da própria pasta. */
+  private roomFor(cwd: string): string {
+    const p = this.deps.projects?.match(cwd);
+    return p ? `project:${p.id}` : normalizeCwd(cwd);
+  }
+
+  /** Projetos mudaram (projects.json): cada agente vivo vai para a sala certa, salas vazias somem. */
+  relocate(): void {
+    const now = this.now();
+    for (const rec of this.agents.values()) {
+      if (rec.info.kind !== 'main' || !rec.info.cwd) continue;
+      const roomId = this.roomFor(rec.info.cwd);
+      if (roomId === rec.info.roomId) continue;
+      this.ensureRoom(roomId, now);
+      rec.info.roomId = roomId;
+      for (const sub of this.descendants(rec.info.id)) sub.info.roomId = roomId;
+    }
+    this.syncProjectRooms();
+    this.dropEmptyRooms();
+    this.recomputeRoomNames();
+    this.markDirty();
+  }
+
+  private syncProjectRooms(): void {
+    for (const [id, r] of this.rooms) {
+      if (!id.startsWith('project:')) continue;
+      const p = this.deps.projects?.get(id.slice('project:'.length));
+      if (!p) continue;
+      r.project = p.id;
+      r.paths = [...p.paths];
+      r.path = p.paths[0] ?? '';
+    }
+  }
+
+  private dropEmptyRooms(): void {
+    const occupied = new Set([...this.agents.values()].map((r) => r.info.roomId));
+    for (const id of [...this.rooms.keys()]) if (!occupied.has(id)) this.rooms.delete(id);
+    this.recomputeRoomNames();
+    this.markDirty();
+  }
+
   private ensureRoom(roomId: string, now: number): void {
     if (this.rooms.has(roomId)) return;
     this.rooms.set(roomId, { path: roomId, createdAt: now });
+    this.syncProjectRooms();
     this.recomputeRoomNames();
     this.notice('room', roomId, 'info', tr('🏗️ Nova sala: {0}', [this.roomName(roomId)]), roomId);
   }
@@ -1054,10 +1098,16 @@ export class Office {
   private recomputeRoomNames(): void {
     const paths = new Map([...this.rooms].map(([id, r]) => [id, r.path]));
     for (const r of this.demoSnap?.rooms ?? []) paths.set(r.id, r.path);
+    for (const id of paths.keys()) if (id.startsWith('project:')) paths.delete(id);
     this.roomNames = roomDisplayNames(paths);
     for (const [id, path] of paths) {
       const alias = this.deps.roomAlias?.(path);
       if (alias) this.roomNames.set(id, alias);
+    }
+    for (const id of this.rooms.keys()) {
+      if (!id.startsWith('project:')) continue;
+      const p = this.deps.projects?.get(id.slice('project:'.length));
+      this.roomNames.set(id, p?.name ?? id);
     }
   }
 

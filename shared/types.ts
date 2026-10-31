@@ -138,6 +138,8 @@ export interface AgentInfo {
   provider?: Provider;
   /** Para subagentes: id do agente que o disparou. */
   parentId?: string;
+  /** Pasta em que a sessão roda (a sala pode ser um projeto com várias pastas). */
+  cwd?: string;
   roomId: string;
   /** Nome humano único no escritório. Ex.: "Marina". */
   name: string;
@@ -193,8 +195,11 @@ export interface RoomInfo {
   id: string;
   /** Nome exibido (basename do cwd, desambiguado se repetido). */
   name: string;
-  /** Caminho completo do projeto. */
+  /** Caminho completo do projeto (sala de projeto: a primeira pasta; vazio se não tiver nenhuma). */
   path: string;
+  /** Sala de projeto (projects.json): id do projeto e todas as pastas dele. Ausente = sala de uma pasta solta. */
+  project?: string;
+  paths?: string[];
   /**
    * Ordem de chegada da sala, atribuída pelo servidor e estável enquanto a sala existir (um slot liberado só é
    * reutilizado após um período de espera). O cliente usa só como ordem: no prédio, cada sala ocupa a primeira vaga

@@ -23,6 +23,7 @@ import { describeStateMigration, legacyEnvWarning, migrateLegacyStateDir } from 
 import { errMsg, log } from './log';
 import { NameStore } from './model/names';
 import { Office } from './model/office';
+import { ProjectStore } from './projects/store';
 import { RoomAliases } from './model/room-aliases';
 import { createPtyRoutes } from './http/pty';
 import { claudeBinFrom, isExecutableFile, loadPty, PtyManager, type ScreenFactory, type SpawnPty } from './pty/manager';
@@ -80,6 +81,8 @@ names.load();
 // Nomes de sala escolhidos pelo usuário (botão direito > Renomear).
 const roomAliases = new RoomAliases(join(config.dataDir, 'rooms.json'));
 roomAliases.load();
+const projects = new ProjectStore(join(config.dataDir, 'projects.json'));
+projects.load();
 
 // Office, contas e fontes de agentes se referenciam (avisos de mudança / fontes): ligação tardia.
 const late: { office?: Office; agents?: SourceSet; permissions?: PermissionRegistry; messages?: MessageRegistry; ptys?: PtyManager; ptyOff?: string } = {};
@@ -119,6 +122,7 @@ const accounts = new AccountsService({
 const office = new Office({
   names,
   roomAlias: (path) => roomAliases.get(path),
+  projects,
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
   build: config.dev ? undefined : createBuildReader(config.rootDir),
@@ -135,6 +139,7 @@ const office = new Office({
   updates: () => updates.status(),
   world: () => world?.meta() ?? { enabled: false, configured: false, state: 'off' },
 });
+projects.onChange(() => office.relocate());
 // Fontes de agentes, uma por ferramenta (sources/source.ts): a do Claude Code e, depois dela, a do Codex (quando há
 // pastas do Codex; HABBLAUD_CODEX=0 desliga), com o histórico dela no HistorySet abaixo e as contas registradas por
 // ela mesma (accounts.setProviderAccounts). `codex` também recebe os eventos dos hooks do Codex (CodexLive).
@@ -312,7 +317,7 @@ const ptys = spawnPty
       accounts: () => accounts.entries().map((a) => ({ id: a.id, dir: a.dir, isDefault: isDefaultDir(a.dir, config.home) })),
       agent: (id) => {
         const a = office.get(id);
-        return a && { id: a.id, kind: a.kind, account: a.account, sessionId: a.sessionId, cwd: office.roomPath(a.roomId) };
+        return a && { id: a.id, kind: a.kind, account: a.account, sessionId: a.sessionId, cwd: a.cwd ?? office.roomPath(a.roomId) };
       },
       onChange: () => office.markDirty(),
       createScreen: ptyScreen,
@@ -353,6 +358,13 @@ if (consult) {
 const api = createApiHandler({
   consult: consult ? createConsultRoutes(consult) : undefined,
   renameRoom: (id, name) => {
+    if (id.startsWith('project:')) {
+      try {
+        return projects.update(id.slice('project:'.length), { name }).name;
+      } catch {
+        return undefined;
+      }
+    }
     const path = office.roomPath(id);
     if (!path) return undefined;
     roomAliases.set(path, name);
