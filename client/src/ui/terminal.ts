@@ -611,7 +611,7 @@ export class TerminalPanel implements UiComponent, TerminalControl {
   /** Horário da entrada mais recente (o rodapé de uma sessão retomada acompanha). */
   private lastEntryAt = 0;
 
-  private filter: TerminalFilter = 'all';
+  private filter: TerminalFilter = 'conversation';
   private filterBtns: HTMLButtonElement[] = [];
   /** Linhas que aparecem com o filtro atual. */
   private visibleRows = 0;
@@ -1122,9 +1122,9 @@ export class TerminalPanel implements UiComponent, TerminalControl {
     });
   }
 
-  /** Mostra ou esconde cada linha conforme o filtro ("Só prompts" depende do que vem depois de cada resposta). */
+  /** Mostra ou esconde cada linha conforme o filtro ("Só conversa" depende do que vem depois de cada resposta). */
   private applyFilter(): void {
-    const finals = this.filter === 'prompts' ? finalAnswerKeys(this.log.values()) : NO_FINALS;
+    const finals = this.filter === 'conversation' ? finalAnswerKeys(this.log.values()) : NO_FINALS;
     let visible = 0;
     for (const item of this.log.values()) {
       const el = this.rows.get(item.key);

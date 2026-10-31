@@ -455,9 +455,9 @@ class Parser implements TerminalParser {
 
   // ---------------------------------------------------------------- entradas
 
-  private userEntry(c: Ctx, raw: string): void {
+  private userEntry(c: Ctx, raw: string, command?: 'slash' | 'bash' | 'scheduled'): void {
     const text = marked(prepare(raw, TEXT_MAX));
-    if (text) this.emit({ kind: 'user', id: `${c.uuid}:u`, at: c.at, text });
+    if (text) this.emit({ kind: 'user', id: `${c.uuid}:u`, at: c.at, text, ...(command ? { command } : {}) });
   }
 
   /** `text` deve vir numa linha só (oneLine) ou ser fixo; a máscara aqui é a última garantia. */
@@ -536,7 +536,7 @@ class Parser implements TerminalParser {
         if (!name) return;
         const cmd = name.startsWith('/') ? name : `/${name}`;
         this.lastCommand = cmd;
-        this.userEntry(c, `${cmd} ${inner(text, 'command-args')?.trim() ?? ''}`.trim());
+        this.userEntry(c, `${cmd} ${inner(text, 'command-args')?.trim() ?? ''}`.trim(), 'slash');
         return;
       }
       case 'local-command-stdout':
@@ -552,7 +552,7 @@ class Parser implements TerminalParser {
       case 'bash-input': {
         // Modo bash do usuário ("! comando"): a saída vem na linha seguinte.
         const cmd = inner(text, 'bash-input')?.trim();
-        if (cmd) this.userEntry(c, `! ${cmd}`);
+        if (cmd) this.userEntry(c, `! ${cmd}`, 'bash');
         return;
       }
       case 'bash-stdout':
@@ -566,7 +566,7 @@ class Parser implements TerminalParser {
       }
       case 'scheduled-task': {
         const body = text.replace(/^<scheduled-task\b[^>]*>/, '').replace(/<\/scheduled-task>\s*$/, '');
-        if (body.trim()) this.userEntry(c, body);
+        if (body.trim()) this.userEntry(c, body, 'scheduled');
         return;
       }
       case 'fork-boilerplate': {
@@ -673,7 +673,7 @@ class Parser implements TerminalParser {
             return;
           }
           const text = marked(prepare(t, TEXT_MAX));
-          if (text) this.emit({ kind: 'assistant', id, at: c.at, text });
+          if (text) this.emit({ kind: 'assistant', id, at: c.at, text, ...(m.stop_reason === 'end_turn' ? { final: true } : {}) });
           return;
         }
         case 'thinking':

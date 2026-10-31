@@ -540,10 +540,17 @@ export type TerminalInputKind = 'command' | 'diff' | 'json' | 'text';
  * entrada 'result' que aponta para a 'tool' pelo `toolUseId`.
  */
 export type TerminalEntry =
-  /** Prompt do usuário ou comando de barra (ex.: "/model"). */
-  | { kind: 'user'; id: string; at: number; text: string }
-  /** Texto da resposta do agente (markdown). */
-  | { kind: 'assistant'; id: string; at: number; text: string }
+  /**
+   * Prompt do usuário ou comando de barra (ex.: "/model"). `command` diz que a entrada NÃO é conversa:
+   * 'slash' = comando de barra, 'bash' = modo bash ("! comando"), 'scheduled' = tarefa agendada. Serve ao
+   * filtro "Só conversa" do terminal (ui/termtools.ts).
+   */
+  | { kind: 'user'; id: string; at: number; text: string; command?: 'slash' | 'bash' | 'scheduled' }
+  /**
+   * Texto da resposta do agente (markdown). `final` = o turno acabou neste texto (stop_reason end_turn na
+   * origem); ausente = o transcript não diz (registros antigos), e o cliente decide pela ordem.
+   */
+  | { kind: 'assistant'; id: string; at: number; text: string; final?: boolean }
   /** Bloco de raciocínio; `text` ausente quando o transcript só guarda a assinatura. */
   | { kind: 'thinking'; id: string; at: number; text?: string }
   /**

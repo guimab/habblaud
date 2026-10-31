@@ -23,6 +23,13 @@ do meio (0.**3**.0).
   gaveta lista as últimas conversas daquele agente — pedido, resposta, estado e hora — do mais recente ao mais antigo.
   Turnos gravados antes disto aparecem sem o pedido ("Registro antigo: o pedido não foi gravado.").
 
+- **Terminal em "Só conversa": só as suas mensagens e as respostas do agente.** O filtro do terminal (que era "Só
+  prompts") virou "Só conversa" e passa a ser o que abre por padrão: ficam de fora os comandos de barra (`/model`), o
+  modo bash (`! comando`), as ferramentas, os resultados, o raciocínio e os eventos da sessão. Quem quiser a execução
+  inteira continua com "Tudo" e "Sem ferramentas" ao lado. A classificação passou a vir do próprio transcript (o
+  comando de barra, o bash e a tarefa agendada vêm marcados, e a resposta final do turno vem com `final`), então o
+  filtro não depende mais de adivinhar pela ordem das linhas.
+
 ## [1.0.3] - 2026-10-16
 
 ### Corrigido

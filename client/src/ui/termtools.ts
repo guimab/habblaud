@@ -1,5 +1,5 @@
 // Ferramentas do terminal: busca na conversa (casamentos sem diferenciar maiúsculas nem acentos,
-// navegação com contador "3/17"), filtro "Tudo / Só prompts / Sem ferramentas" e o texto copiado de cada entrada.
+// navegação com contador "3/17"), filtro "Tudo / Só conversa / Sem ferramentas" e o texto copiado de cada entrada.
 // As funções do modelo são puras e testadas em ui/termtools.test.ts. O destaque dos resultados troca nós de texto
 // por spans criados com createElement/textContent: nenhum texto do transcript passa por innerHTML.
 import type { TerminalEntry } from '../../../shared/types';
@@ -8,11 +8,11 @@ import { tr } from '../../../shared/i18n';
 
 // ---------------------------------------------------------------- filtro
 
-export type TerminalFilter = 'all' | 'prompts' | 'noTools';
+export type TerminalFilter = 'all' | 'conversation' | 'noTools';
 
 export const TERMINAL_FILTERS: readonly [TerminalFilter, string, string][] = [
   ['all', tr('Tudo'), tr('Toda a conversa')],
-  ['prompts', tr('Só prompts'), tr('Só os seus prompts e as respostas finais do agente')],
+  ['conversation', tr('Só conversa'), tr('Só as suas mensagens e as respostas do agente: sem comandos, ferramentas, raciocínio nem eventos')],
   ['noTools', tr('Sem ferramentas'), tr('Esconde as ferramentas e os resultados')],
 ];
 
@@ -40,12 +40,18 @@ export function finalAnswerKeys(items: Iterable<TerminalItem>): Set<string> {
   return finals;
 }
 
-/** O item aparece com o filtro? (`finals` = finalAnswerKeys, usado só por "Só prompts".) */
+/** O item aparece com o filtro? (`finals` = finalAnswerKeys, o fallback de "Só conversa" nos transcripts antigos.) */
 export function itemVisible(item: TerminalItem, filter: TerminalFilter, finals: ReadonlySet<string>): boolean {
   if (filter === 'all') return true;
   if (item.type !== 'entry') return false;
   if (filter === 'noTools') return true;
-  return item.entry.kind === 'user' || (item.entry.kind === 'assistant' && finals.has(item.key));
+  // "Só conversa": as suas mensagens (de fora ficam os comandos de barra, o modo bash e o que veio de uma
+  // tarefa agendada) e as respostas do agente.
+  if (item.entry.kind === 'user') return !item.entry.command;
+  if (item.entry.kind !== 'assistant') return false;
+  // O "final" vem marcado da origem; sem ele (transcript antigo), vale a posição: texto sem ferramenta depois
+  // dele até o próximo prompt.
+  return item.entry.final ?? finals.has(item.key);
 }
 
 // ---------------------------------------------------------------- busca

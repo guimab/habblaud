@@ -33,6 +33,21 @@ function userBlocks(blocks: Array<Record<string, unknown>>, at = T0): string {
 }
 
 describe('terminal — prompts do usuário', () => {
+  it('marca o que não é conversa: comando de barra, modo bash e tarefa agendada', () => {
+    const e = run([
+      L.prompt('Arruma o bug do carrinho'),
+      L.prompt('<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>123</command-args>'),
+      L.prompt('<bash-input>ls -la</bash-input>'),
+      L.prompt('<scheduled-task>rotina do dia</scheduled-task>'),
+    ]);
+    expect(only(e, 'user').map((x) => x.command)).toEqual([undefined, 'slash', 'bash', 'scheduled']);
+  });
+
+  it('marca a resposta final do turno (stop_reason end_turn) e deixa as intermediárias sem marca', () => {
+    const e = run([L.assistant([L.text('Vou ler o arquivo.')], { stop: 'tool_use' }), L.assistant([L.text('Pronto, terminei.')], { stop: 'end_turn' })]);
+    expect(only(e, 'assistant').map((x) => x.final)).toEqual([undefined, true]);
+  });
+
   it('prompt vira user; meta e lembretes de sistema somem; at vem do timestamp', () => {
     const e = run([
       L.meta('Caveat: mensagens locais'),

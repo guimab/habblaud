@@ -15,8 +15,8 @@ import {
   type TerminalFilter,
 } from './termtools';
 
-const user = (id: string, text = 'oi'): TerminalEntry => ({ kind: 'user', id, at: 1, text });
-const say = (id: string, text = 'feito'): TerminalEntry => ({ kind: 'assistant', id, at: 2, text });
+const user = (id: string, text = 'oi', command?: 'slash' | 'bash' | 'scheduled'): TerminalEntry => ({ kind: 'user', id, at: 1, text, ...(command ? { command } : {}) });
+const say = (id: string, text = 'feito', final?: boolean): TerminalEntry => ({ kind: 'assistant', id, at: 2, text, ...(final === undefined ? {} : { final }) });
 const tool = (id: string, extra: Partial<Extract<TerminalEntry, { kind: 'tool' }>> = {}): TerminalEntry => ({ kind: 'tool', id, at: 3, tool: 'Bash', title: 'Bash(npm test)', ...extra });
 const result = (id: string, toolUseId: string, text = 'ok'): TerminalEntry => ({ kind: 'result', id, at: 4, toolUseId, text });
 const think = (id: string): TerminalEntry => ({ kind: 'thinking', id, at: 5, text: 'hmm' });
@@ -111,13 +111,24 @@ describe('filtro', () => {
     expect([...finalAnswerKeys(items(user('u1'), say('a1'), tool('t1')))]).toEqual([]);
   });
 
-  it('Tudo / Só prompts / Sem ferramentas', () => {
+  it('Tudo / Só conversa / Sem ferramentas', () => {
     const list = items(user('u1'), think('th1'), say('a1', 'Vou rodar.'), tool('t1'), result('r1', 't1'), result('r9', 'outra'), say('a2', 'Passou.'), sys('s1'));
     const finals = finalAnswerKeys(list);
     const visible = (f: TerminalFilter) => list.filter((i) => itemVisible(i, f, finals)).map((i) => i.key);
     expect(visible('all')).toEqual(list.map((i) => i.key));
-    expect(visible('prompts')).toEqual(['user:u1', 'assistant:a2']);
+    expect(visible('conversation')).toEqual(['user:u1', 'assistant:a2']);
     expect(visible('noTools')).toEqual(['user:u1', 'thinking:th1', 'assistant:a1', 'assistant:a2', 'system:s1']);
+  });
+
+  it('Só conversa: comando de barra, modo bash e tarefa agendada ficam de fora (não são conversa)', () => {
+    const list = items(user('u1', 'arruma o carrinho'), user('u2', '/review 123', 'slash'), user('u3', '! ls -la', 'bash'), user('u4', 'rotina do dia', 'scheduled'), say('a1', 'Feito.', true));
+    const visible = list.filter((i) => itemVisible(i, 'conversation', finalAnswerKeys(list))).map((i) => i.key);
+    expect(visible).toEqual(['user:u1', 'assistant:a1']);
+  });
+
+  it('Só conversa: com o "final" marcado na origem, vale ele (a ordem não decide)', () => {
+    const list = items(user('u1'), say('a1', 'Vou ler o arquivo.', false), tool('t1'), say('a2', 'Pronto, terminei.', true));
+    expect(list.filter((i) => itemVisible(i, 'conversation', finalAnswerKeys(list))).map((i) => i.key)).toEqual(['user:u1', 'assistant:a2']);
   });
 });
 
