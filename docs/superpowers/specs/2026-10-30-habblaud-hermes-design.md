@@ -81,6 +81,37 @@ O que o código mostra (revisão do construtor):
 Consequência: agentes criados pelo Habblaud (origem `api_server`) têm todas as ações; sessões de TUI, Telegram e CLI
 aparecem no escritório e podem ser lidas, mas sem ações.
 
+## Vocabulário dos termos
+
+Uma palavra, um sentido — no código e na interface. A confusão era "agente" significar ora a identidade, ora a
+execução.
+
+- **Agente** = a **ficha**: identidade durável (nome, papel, projeto, instruções, modelo, personagem, agendas).
+  Existe sem nada rodando. No código: `agents.json`, `/api/cards` e `/api/agents`. Ficha sem projeto fica na sala
+  "Sem projeto".
+- **Sessão** = uma **execução** do agente (uma conversa, uma rodada de agenda, uma tarefa). Tem id do driver
+  (ex.: `api_1793482828_4d570e65`), começa e termina, e pertence a no máximo uma ficha. Hoje `/api/snapshot`
+  `agents[]` é uma lista de **sessões** (`hermes:<pid>`) e "Agente principal" (`AgentInfo.role`) é rótulo de sessão.
+- **Personagem** = o boneco: aparência da ficha, não da sessão; a mesma pessoa sempre. Sessão sem ficha tem nome e
+  personagem sorteados do id da sessão — é daí a impressão de que agente = sessão.
+- **Estado** = como a sessão está agora: Trabalhando, Precisa de você, Esperando o shell, Ocioso, Concluído, Saindo,
+  Dormindo. Estado é atributo da sessão, nunca entidade.
+- **Ocioso** = sessão **aberta sem turno em andamento**. No adaptador do Hermes: sem lease de turno ativa e última
+  mensagem com mais de `TURN_FRESH_S` (30 s) → `idle` → rótulo "Ocioso". Não significa "sem trabalho" (pode haver
+  trabalho pendente e ninguém ter pedido nada), não significa "sem ficha" e não significa "parado por alguém". O que o
+  escritório encena em cima disso (sentar, passear, cochilar após `LONG_IDLE_MS` = 10 min) não muda o estado real.
+- **Dormindo** = ficha **sem sessão viva** (`card:<id>`), o único personagem que existe sem sessão. Cochilar na mesa
+  (ocioso há 10 min) não é dormir (ficha sem execução).
+- **Driver/harness** = quem executa a sessão (Hermes, Claude Code, Codex): encanamento e contrato. Nunca tem
+  personagem, sala nem ficha.
+- **Convidado** = sessão que não pertence a ficha nenhuma (TUI, Telegram, CLI): aparece, é só leitura e pode ser
+  adotada por uma ficha.
+- **Subagente** = sessão temporária aberta por outra sessão; termina em "Concluído".
+- **Consultor** = sessão de conversa avulsa, sem ficha; arquiva sozinha e pode ser promovida a ficha.
+
+Regra de ouro: **agente é ficha, sessão é execução, personagem é aparência, estado é momento, driver é quem executa**.
+Na interface, "agente" nunca deve querer dizer sessão.
+
 ## Modelo de dados do Habblaud
 
 Tudo isto é do Habblaud (arquivos JSON no diretório de dados), não do Hermes; o driver só traduz.
@@ -103,8 +134,9 @@ Tudo isto é do Habblaud (arquivos JSON no diretório de dados), não do Hermes;
 
 O Habblaud não ganha cenário sob medida por projeto; cada projeto só preenche dados.
 
-- Estado: trabalhando, esperando você (mão levantada), parado, agendado (relógio com a próxima execução),
-  dormindo (sem sessão), com erro.
+- Estado: ocioso (sessão aberta sem turno — visualmente "parado"), trabalhando, esperando você (mão levantada),
+  esperando o shell, agendado (relógio com a próxima execução), dormindo (ficha sem sessão), com erro. Os nomes seguem
+  "Vocabulário dos termos".
 - Origem do trabalho atual: ícone pequeno (manual, rotina, canal, alerta).
 - Com quem fala: balão "conversando com X via Y".
 - Ferramenta em uso: "usando X" (já existe).
