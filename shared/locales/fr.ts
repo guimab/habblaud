@@ -3290,4 +3290,18 @@ export const FR: Readonly<Record<string, string>> = {
   "Carimbo deixado na portaria: {0}": "Tampon laissé à l'accueil : {0}",
   "Entre no prédio ou chegue mais perto da porta para carimbar.": "Entrez dans l'immeuble ou approchez-vous de la porte pour tamponner.",
   "O carimbo não foi deixado. Tente de novo.": "Le tampon n'a pas été laissé. Réessayez.",
+
+  // client/src/ui/consult.ts, topbar.ts, server/http/app.ts (consultor)
+  "Contexto (opcional): quem você é, o que está fazendo, o que importa": "Contexte (facultatif) : qui vous êtes, ce que vous faites, ce qui compte",
+  "Incluir o que estou vendo (agente ou sala selecionados)": "Inclure ce que je vois (agent ou salle sélectionnés)",
+  "Pergunte (Ctrl+Enter envia)": "Posez votre question (Ctrl+Entrée envoie)",
+  "Nova consulta": "Nouvelle consultation",
+  "Arquivar": "Archiver",
+  "Consultor": "Conseiller",
+  "agente \"{0}\"": "agent « {0} »",
+  "tarefa: {0}": "tâche : {0}",
+  "sala {0} ({1})": "salle {0} ({1})",
+  "Usando {0}…": "Utilise {0}…",
+  "Consultor: pergunta rápida numa sessão nova do Hermes (C)": "Conseiller : question rapide dans une nouvelle session Hermes (C)",
+  "consultor desligado (configure HABBLAUD_HERMES_URL e HABBLAUD_HERMES_KEY)": "conseiller désactivé (configurez HABBLAUD_HERMES_URL et HABBLAUD_HERMES_KEY)",
 };

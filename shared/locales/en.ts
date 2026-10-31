@@ -3273,4 +3273,18 @@ export const EN: Readonly<Record<string, string>> = {
   "Carimbo deixado na portaria: {0}": "Stamp left at the front desk: {0}",
   "Entre no prédio ou chegue mais perto da porta para carimbar.": "Go into the building or get closer to the door to stamp.",
   "O carimbo não foi deixado. Tente de novo.": "The stamp wasn't left. Try again.",
+
+  // client/src/ui/consult.ts, topbar.ts, server/http/app.ts (consultor)
+  "Contexto (opcional): quem você é, o que está fazendo, o que importa": "Context (optional): who you are, what you're doing, what matters",
+  "Incluir o que estou vendo (agente ou sala selecionados)": "Include what I'm looking at (selected agent or room)",
+  "Pergunte (Ctrl+Enter envia)": "Ask (Ctrl+Enter sends)",
+  "Nova consulta": "New consult",
+  "Arquivar": "Archive",
+  "Consultor": "Advisor",
+  "agente \"{0}\"": "agent \"{0}\"",
+  "tarefa: {0}": "task: {0}",
+  "sala {0} ({1})": "room {0} ({1})",
+  "Usando {0}…": "Using {0}…",
+  "Consultor: pergunta rápida numa sessão nova do Hermes (C)": "Advisor: quick question in a new Hermes session (C)",
+  "consultor desligado (configure HABBLAUD_HERMES_URL e HABBLAUD_HERMES_KEY)": "advisor is off (set HABBLAUD_HERMES_URL and HABBLAUD_HERMES_KEY)",
 };
