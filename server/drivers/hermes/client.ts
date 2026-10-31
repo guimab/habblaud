@@ -1,5 +1,5 @@
 // Driver do Hermes: fala só com a API HTTP do gateway (API_SERVER_*). Nada de state.db.
-import type { AgentDriver, ChatEvent, DriverCapability, DriverSession } from '../contract';
+import type { AgentDriver, ChatEvent, ChatOptions, CreateSessionOptions, DriverCapability, DriverSession } from '../contract';
 import { parseSse } from './sse';
 
 const TITLE_TRIES = 30;
@@ -90,10 +90,12 @@ export class HermesDriver implements AgentDriver {
     throw new HermesError(this.clean(`Hermes respondeu ${res.status}: ${text.slice(0, 200)}`));
   }
 
-  async createSession(opts: { title: string }): Promise<DriverSession> {
+  async createSession(opts: CreateSessionOptions): Promise<DriverSession> {
     for (let n = 1; n <= TITLE_TRIES; n++) {
       const title = n === 1 ? opts.title : `${opts.title} (${n})`;
-      const res = await this.request('POST', '/api/sessions', { title, source: 'api_server' });
+      const req: Record<string, unknown> = { title, source: 'api_server' };
+      if (opts.model?.trim()) req.model = opts.model.trim();
+      const res = await this.request('POST', '/api/sessions', req);
       if (res.ok) {
         const b = (await res.json()) as { id?: unknown; session?: { id?: unknown } };
         const id = b.session?.id ?? b.id;
@@ -106,8 +108,10 @@ export class HermesDriver implements AgentDriver {
     throw new HermesError(`nenhum título livre para "${opts.title}"`);
   }
 
-  async *chat(sessionId: string, message: string, signal: AbortSignal): AsyncIterable<ChatEvent> {
-    const res = await this.request('POST', `/api/sessions/${encodeURIComponent(sessionId)}/chat/stream`, { message }, signal);
+  async *chat(sessionId: string, message: string, signal: AbortSignal, opts: ChatOptions = {}): AsyncIterable<ChatEvent> {
+    const body: Record<string, unknown> = { message };
+    if (opts.system?.trim()) body.system_message = opts.system.trim();
+    const res = await this.request('POST', `/api/sessions/${encodeURIComponent(sessionId)}/chat/stream`, body, signal);
     if (!res.ok) await this.fail(res);
     if (!res.body) throw new HermesError('resposta do Hermes sem corpo');
     for await (const f of parseSse(res.body)) {

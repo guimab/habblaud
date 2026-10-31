@@ -46,6 +46,24 @@ describe('HermesDriver', () => {
     expect(seen[0]).toMatchObject({ method: 'POST', url: '/api/sessions', auth: 'Bearer k123', body: { title: 'Consultor', source: 'api_server' } });
   });
 
+  it('cria sessão com modelo quando pedido', async () => {
+    const { base, seen } = await fake((_r, res) => json(res, 201, { session: { id: 's9' } }));
+    await new HermesDriver({ baseUrl: base, key: 'k' }).createSession({ title: 'Ficha', model: 'gpt-x' });
+    expect(seen[0]?.body).toEqual({ title: 'Ficha', source: 'api_server', model: 'gpt-x' });
+  });
+
+  it('chat manda system_message quando há instruções', async () => {
+    const { base, seen } = await fake((_r, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.end('event: done\ndata: {}\n\n');
+    });
+    const d = new HermesDriver({ baseUrl: base, key: 'k' });
+    for await (const _ of d.chat('s1', 'oi', new AbortController().signal, { system: 'Responda em PT.' })) void _;
+    for await (const _ of d.chat('s1', 'oi', new AbortController().signal, { system: '  ' })) void _;
+    expect(seen[0]?.body).toEqual({ message: 'oi', system_message: 'Responda em PT.' });
+    expect(seen[1]?.body).toEqual({ message: 'oi' });
+  });
+
   it('título em uso tenta (2), (3)…', async () => {
     const { base, seen } = await fake((r, res) => {
       const t = (r.body as { title: string }).title;

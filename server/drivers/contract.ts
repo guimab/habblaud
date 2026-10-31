@@ -22,12 +22,23 @@ export interface DriverSession {
   title: string;
 }
 
+export interface CreateSessionOptions {
+  title: string;
+  model?: string;
+}
+
+export interface ChatOptions {
+  system?: string;
+}
+
 export interface AgentDriver {
   /** Identificador estável do driver (ex.: 'hermes'). */
   readonly id: string;
   capabilities(): Promise<ReadonlySet<DriverCapability>>;
-  createSession(opts: { title: string }): Promise<DriverSession>;
-  /** Envia uma mensagem e devolve a resposta em eventos; `signal` aborta a conversa com o framework. */
-  chat(sessionId: string, message: string, signal: AbortSignal): AsyncIterable<ChatEvent>;
+  /** `model` vazio = padrão do framework. As instruções vão por turno em `chat` (ver ChatOptions). */
+  createSession(opts: CreateSessionOptions): Promise<DriverSession>;
+  /** Envia uma mensagem e devolve a resposta em eventos; `signal` aborta a conversa com o framework. `system` vai a
+   *  cada turno: verificado no Hermes que o system_prompt da criação NÃO vale nos turnos (só o system_message). */
+  chat(sessionId: string, message: string, signal: AbortSignal, opts?: ChatOptions): AsyncIterable<ChatEvent>;
   archive(sessionId: string): Promise<void>;
 }
