@@ -24,6 +24,7 @@ import type { FileFetcher } from '../deliveries/fetcher';
 import { HOST_WAIT_MS } from '../host-wait';
 import type { ConsultRoute } from '../consult/http';
 import type { ProjectRoute } from '../projects/http';
+import type { CardRoute } from '../agents/http';
 
 export interface ApiDeps {
   office: Office;
@@ -71,6 +72,8 @@ export interface ApiDeps {
   consult?: ConsultRoute;
   /** Projetos (projects/http.ts); ausente = rotas 404 (testes). */
   projects?: ProjectRoute;
+  /** Fichas de agente (/api/cards). */
+  cards?: CardRoute;
   /** Pastas sugeridas no "Novo agente" (GET /api/spawn/folders; spawn/folders.ts): projetos recentes. */
   spawnFolders?: () => Promise<SpawnFolder[]>;
   /** Anexos do "Novo agente" (POST /api/spawn/attachments; spawn/attachments.ts). */
@@ -405,6 +408,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
           terminal: !!terminals && trusted(req, 'terminal'),
           spawn: !!deps.spawn && trusted(req, 'spawn'),
           projects: !!deps.projects && trusted(req, 'projects'),
+          agents: !!deps.cards && trusted(req, 'agents'),
           world: !!deps.world && !!deps.terminal && !remote && isLoopbackHost(req.headers.host),
         };
         sendJson(res, 200, access);
@@ -496,6 +500,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
       } else handleCodexEvent(req, res, { live: deps.codexLive, entries: () => accounts.entriesOf('codex') }).catch((err) => fail(res, err));
       return true;
     }
+    if (deps.cards && (path === '/api/cards' || path.startsWith('/api/cards/'))) return deps.cards(req, res, path, method, trusted(req, 'agents'));
     if (deps.projects && (path === '/api/projects' || path.startsWith('/api/projects/'))) return deps.projects(req, res, path, method, trusted(req, 'projects'));
     if (path === '/api/consult' || path.startsWith('/api/consult/')) {
       if (!deps.consult) {

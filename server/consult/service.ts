@@ -87,6 +87,14 @@ export class ConsultService {
     }
   }
 
+  /** Promover a agente: a consulta sai do consultor (não é mais arquivada sozinha) e devolve a sessão. */
+  promote(id: string): string {
+    const e = this.get(id);
+    if (e.archived) throw new ConsultError('consulta arquivada', 'archived');
+    this.entries.delete(id);
+    return e.sessionId;
+  }
+
   list(): Consult[] {
     return [...this.entries.values()].map((e) => this.view(e));
   }

@@ -143,6 +143,8 @@ export interface AgentInfo {
   cwd?: string;
   /** Ficha de agente (server/agents) que dá identidade a esta sessão; dorminhoco = id `card:<cardId>`. */
   cardId?: string;
+  /** Id da sessão no driver (ex.: Hermes), para adotar a sessão numa ficha. */
+  driverSession?: string;
   roomId: string;
   /** Nome humano único no escritório. Ex.: "Marina". */
   name: string;
@@ -409,6 +411,8 @@ export interface AccessInfo {
   spawn: boolean;
   /** Pode criar e alterar projetos (/api/projects; remoto: HABBLAUD_REMOTE_ALLOW=projects). */
   projects?: boolean;
+  /** Pode criar e alterar fichas de agente (/api/cards; remoto: HABBLAUD_REMOTE_ALLOW=agents). */
+  agents?: boolean;
   /**
    * Pode usar a conta do Habblaud World (/api/world/*): recurso ligado (HABBLAUD_WORLD), trava do terminal e porta local
    * com Host local. Ausente em servidores antigos.

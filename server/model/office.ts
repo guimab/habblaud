@@ -372,7 +372,10 @@ export class Office {
     }
     if (p.status === 'waiting') info.waitingFor = p.waitingFor ?? tr('responder no terminal');
     const rec: AgentRecord = { info, history: [] };
-    if (p.driverSession) rec.driverSession = p.driverSession;
+    if (p.driverSession) {
+      rec.driverSession = p.driverSession;
+      info.driverSession = p.driverSession;
+    }
     if (p.status === 'working') rec.turnStart = now;
     this.agents.set(p.id, rec);
     this.applyCard(rec, now);

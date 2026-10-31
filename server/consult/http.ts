@@ -23,20 +23,34 @@ function sendError(res: ServerResponse, err: unknown): void {
 }
 
 async function streamMessage(svc: ConsultService, req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
+  const text = await readText(req);
+  await streamChat(res, (signal) => svc.send(id, text, signal), (err) => err instanceof ConsultError);
+}
+
+/** Lê `{text}` do corpo (até CONSULT_TEXT_MAX, não vazio). */
+export async function readText(req: IncomingMessage): Promise<string> {
   const body = (await readJson(req)) as { text?: unknown } | null;
   const text = optText(body?.text, CONSULT_TEXT_MAX, 'text');
   if (!text?.trim()) throw new HttpError(400, 'esperado {text: texto não vazio}');
+  return text;
+}
+
+/**
+ * Responde uma conversa em SSE (eventos `delta`/`tool`/`done`/`error`). Erro antes do primeiro evento que
+ * `statusError` reconhece vira status HTTP (lançado de volta); os outros viram evento `error`.
+ */
+export async function streamChat(res: ServerResponse, start: (signal: AbortSignal) => AsyncIterable<unknown>, statusError: (err: unknown) => boolean): Promise<void> {
   const ctrl = new AbortController();
   const onClose = () => ctrl.abort();
   res.on('close', onClose);
-  const it = svc.send(id, text, ctrl.signal)[Symbol.asyncIterator]();
+  const it = start(ctrl.signal)[Symbol.asyncIterator]();
   try {
     // Primeiro evento antes do cabeçalho: erro de consulta desconhecida/arquivada ainda vira status HTTP.
     let next: IteratorResult<unknown>;
     try {
       next = await it.next();
     } catch (err) {
-      if (err instanceof ConsultError) throw err;
+      if (statusError(err)) throw err;
       next = { done: false, value: { type: 'error', message: err instanceof Error ? err.message : 'erro no driver' } };
       res.writeHead(200, sseHeaders());
       res.end(frame(next.value as { type: string }));

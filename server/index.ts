@@ -26,6 +26,8 @@ import { Office } from './model/office';
 import { createProjectRoutes } from './projects/http';
 import { ProjectStore } from './projects/store';
 import { AgentStore } from './agents/store';
+import { createCardRoutes } from './agents/http';
+import { CardService } from './agents/service';
 import { RoomAliases } from './model/room-aliases';
 import { createPtyRoutes } from './http/pty';
 import { claudeBinFrom, isExecutableFile, loadPty, PtyManager, type ScreenFactory, type SpawnPty } from './pty/manager';
@@ -360,7 +362,8 @@ const ticker = setInterval(() => {
 }, 250);
 
 // Consultor: sessões rápidas no Hermes pela API HTTP (desligado sem HABBLAUD_HERMES_*).
-const consult = config.hermes ? new ConsultService({ driver: new HermesDriver({ baseUrl: config.hermes.baseUrl, key: config.hermes.key }) }) : undefined;
+const hermesDriver = config.hermes ? new HermesDriver({ baseUrl: config.hermes.baseUrl, key: config.hermes.key }) : undefined;
+const consult = hermesDriver ? new ConsultService({ driver: hermesDriver }) : undefined;
 if (consult) {
   setInterval(() => void consult.sweep().catch(() => {}), 60_000).unref();
   log.info(`   Consultor ligado (Hermes em ${config.hermes!.baseUrl}).`);
@@ -369,6 +372,7 @@ if (consult) {
 const api = createApiHandler({
   consult: consult ? createConsultRoutes(consult) : undefined,
   projects: createProjectRoutes(projects),
+  cards: createCardRoutes({ cards: agentCards, ...(hermesDriver ? { service: new CardService({ cards: agentCards, driver: hermesDriver, projects }) } : {}), ...(consult ? { consult } : {}) }),
   renameRoom: (id, name) => {
     if (id.startsWith('project:')) {
       try {
