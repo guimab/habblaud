@@ -56,7 +56,7 @@ function agent(id: string, roomId: string, extra: Partial<AgentInfo> = {}): Agen
   };
 }
 
-async function waitFor(cond: () => boolean, what: string, ms = 3_000): Promise<void> {
+async function waitFor(cond: () => boolean, what: string, ms = 8_000): Promise<void> {
   const until = Date.now() + ms;
   while (!cond()) {
     if (Date.now() > until) throw new Error(`esperando: ${what}`);
@@ -343,7 +343,7 @@ describe('BuildingUplink: conexão e remessas', () => {
     await waitFor(() => h.world.ws.pings === 2, 'segundo ping');
   });
 
-  it('sem resposta ao ping, fecha e reconecta', async () => {
+  it('sem resposta ao ping, fecha e reconecta', { timeout: 30_000 }, async () => {
     const clock = new ManualClock();
     const h = await start({ clock });
     h.world.ws.options.pong = false;

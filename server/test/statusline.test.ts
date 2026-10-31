@@ -302,7 +302,8 @@ describe('statusline-install.ts (arquivos, HOME falso)', () => {
   });
 
   // No Windows o chmod não tira a escrita de uma pasta: o rename passaria.
-  it.skipIf(!HAS_POSIX_MODES)('nome antigo: se não der para mover, avisa e instala assim mesmo', () => {
+  // O root ignora o modo da pasta (o rename passaria), como o Windows.
+  it.skipIf(!HAS_POSIX_MODES || process.getuid?.() === 0)('nome antigo: se não der para mover, avisa e instala assim mesmo', () => {
     mkdirSync(join(home, '.codetown', 'usage'), { recursive: true });
     // HOME só de leitura: o rename de ~/.codetown falha (as contas, por dentro, seguem graváveis).
     chmodSync(home, 0o555);
