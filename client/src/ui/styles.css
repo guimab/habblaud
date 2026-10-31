@@ -11362,3 +11362,15 @@ html.is-replay #world {
   border-left: 3px solid #e5a50a;
   background: rgba(229, 165, 10, 0.08);
 }
+
+/* Agendas na ficha do agente (ui/schedules.ts) */
+.ui-sched { margin-top: 12px; border-top: 1px solid var(--ui-border, rgba(255,255,255,.12)); padding-top: 8px; display: grid; gap: 6px; }
+.ui-sched__title { margin: 0; font-size: 13px; }
+.ui-sched__list { display: grid; gap: 6px; }
+.ui-sched__item { padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.04); }
+.ui-sched__item.is-off { opacity: .6; }
+.ui-sched__new > summary { cursor: pointer; font-size: 12px; }
+.ui-sched__form { display: grid; gap: 6px; margin-top: 6px; }
+.ui-sched__days { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.ui-sched__day { display: inline-flex; gap: 2px; align-items: center; }
+.ui-sched__num { width: 5em; }

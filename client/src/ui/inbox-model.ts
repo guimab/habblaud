@@ -11,7 +11,7 @@ export interface InboxItem {
   text: string;
   at: number;
   runId?: string;
-  owner?: { kind: 'card' | 'consult'; id: string; sessionId: string; title?: string };
+  owner?: { kind: 'card' | 'consult'; id: string; sessionId: string; title?: string; scheduleId?: string };
   approval?: ApprovalView;
   permissionId?: string;
   agentId?: string;

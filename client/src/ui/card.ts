@@ -8,6 +8,7 @@ import type { AgentInfo, RoomInfo } from '../../../shared/types';
 import { access } from '../net/access';
 import type { UiContext } from './context';
 import { h, setHidden, setText } from './dom';
+import { ScheduleSection } from './schedules';
 
 export interface CardDto {
   id: string;
@@ -64,6 +65,7 @@ export class CardSection {
   private agent?: AgentInfo;
   private loadedFor = '';
   private card?: CardDto;
+  private readonly schedules = new ScheduleSection();
 
   constructor(private readonly ctx: UiContext) {
     this.name = h('input', { class: 'ui-rename__input', type: 'text', attrs: { maxlength: 40 } });
@@ -83,6 +85,7 @@ export class CardSection {
       field(tr('Modelo'), this.model),
       field(tr('Instruções'), this.instructions),
       h('div', { class: 'ui-project__row' }, h('button', { class: 'ui-btn', type: 'button', text: tr('Salvar'), on: { click: () => void this.save() } }), this.releaseBtn, h('button', { class: 'ui-btn ui-btn--link', type: 'button', text: tr('Apagar ficha'), on: { click: () => void this.remove() } })),
+      this.schedules.el,
     );
     this.adoptSel = h('select', { class: 'ui-select', attrs: { 'aria-label': tr('Adotar em…') } });
     this.adoptSel.addEventListener('change', () => void this.adopt());
@@ -126,6 +129,7 @@ export class CardSection {
       projectOptions(this.ctx, this.project, c.projectId);
       this.model.value = c.model ?? '';
       this.instructions.value = c.instructions ?? '';
+      void this.schedules.load(c.id);
       this.say('');
     } catch (err) {
       this.say(err instanceof Error ? err.message : String(err), true);
