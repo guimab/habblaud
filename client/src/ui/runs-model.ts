@@ -1,22 +1,9 @@
 // Conversas de um agente (ui/drawer.ts): os turnos que ele já rodou, do mais recente ao mais antigo, com o pedido
 // que os originou. Os runs vêm de GET /api/runs (um registro por turno; ver server/runs/manager.ts).
+import type { RunState, RunView } from '../../../shared/types';
 import { tr } from '../../../shared/i18n';
 
-export type RunState = 'running' | 'waiting' | 'done' | 'error' | 'interrupted';
-
-/** O que o painel usa de um run. */
-export interface RunView {
-  runId: string;
-  state: RunState;
-  /** O pedido que originou o turno (ausente nos registros antigos, de antes de o pedido ser gravado). */
-  prompt?: string;
-  /** Resposta acumulada. */
-  text: string;
-  /** Fim (ou última mudança) do turno. */
-  at: number;
-  error?: string;
-  owner: { kind: 'card' | 'consult'; id: string; sessionId: string; title?: string };
-}
+export type { RunState, RunView };
 
 /** Quanto do pedido aparece na lista antes de cortar. */
 export const RUN_PROMPT_MAX = 160;

@@ -469,6 +469,28 @@ export interface AgentDetail {
   history: Activity[];
 }
 
+// ------------------------------------------------------------------ conversas (runs em segundo plano)
+
+/** Estado de um turno em segundo plano (ver server/runs/manager.ts). */
+export type RunState = 'running' | 'waiting' | 'done' | 'error' | 'interrupted';
+
+/**
+ * Um turno já rodado (GET /api/runs): o que a interface mostra do run — o pedido que o originou, a resposta e
+ * como terminou. A gaveta do agente filtra por dono (ui/runs-model.ts).
+ */
+export interface RunView {
+  runId: string;
+  state: RunState;
+  /** O pedido que originou o turno (ausente nos registros antigos, de antes de o pedido ser gravado). */
+  prompt?: string;
+  /** Resposta acumulada. */
+  text: string;
+  /** Fim (ou última mudança) do turno. */
+  at: number;
+  error?: string;
+  owner: { kind: 'card' | 'consult'; id: string; sessionId: string; title?: string; scheduleId?: string };
+}
+
 // ------------------------------------------------------------------ mod do Claude Code
 
 /**

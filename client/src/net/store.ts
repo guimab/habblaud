@@ -5,8 +5,7 @@
 // Também cuida da reconexão: quando o navegador desiste do stream (EventSource fechado após erro HTTP,
 // ex.: servidor reiniciando atrás de um proxy), tenta de novo com espera crescente.
 import type { AppearanceParts } from '../../../shared/appearance';
-import type { RunView } from '../ui/runs-model';
-import type { Activity, AgentDetail, AgentInfo, FeedItem, Notice, OfficeSnapshot, OutboxMessage, PermissionDecision, PermissionRequestInfo, RoomInfo } from '../../../shared/types';
+import type { Activity, AgentDetail, AgentInfo, FeedItem, Notice, OfficeSnapshot, OutboxMessage, PermissionDecision, PermissionRequestInfo, RoomInfo, RunView } from '../../../shared/types';
 import { DemoSimulator } from '../../../shared/demo/simulator';
 import { tr } from '../../../shared/i18n';
 
