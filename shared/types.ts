@@ -354,6 +354,12 @@ export interface OfficeSnapshot {
      */
     terminal?: boolean;
     /**
+     * Cartões de uso por conta na barra do topo (HABBLAUD_USAGE_CARDS=0 desliga). Desligado, conta sem números
+     * (estado "empty") não ganha cartão — some o "sem dados de uso"/"Como ativar" de contas que nunca terão esses
+     * números por não serem do Claude Code nem do Codex (ex.: uma conta alimentada por outro agente). Ausente = ligado.
+     */
+    usageCards?: boolean;
+    /**
      * Mensagens pelo escritório ligadas (POST /api/messages): a mesma trava do terminal e HABBLAUD_MENSAGENS sem
      * desligar. Quem recebe agora diz AgentInfo.canMessage. Ausente/false = recurso desligado.
      */

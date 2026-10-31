@@ -37,6 +37,9 @@ services:
       # 0 desliga a verificação de versão nova (consulta às releases no GitHub a cada 6 h).
       HABBLAUD_UPDATE_CHECK: ${HABBLAUD_UPDATE_CHECK:-}
       HABBLAUD_LANG: ${HABBLAUD_LANG:-}
+      # 0: conta sem números de uso não ganha cartão na barra do topo (caso de conta que não é do Claude Code nem do
+      # Codex, como a alimentada pelo adaptador do Hermes). Ausente = ligado, como de fábrica.
+      HABBLAUD_USAGE_CARDS: ${HABBLAUD_USAGE_CARDS:-}
       # 0 desliga as sessões do Codex no escritório.
       HABBLAUD_CODEX: ${HABBLAUD_CODEX:-}
       # 1 liga o Novo agente pelo escritório (no Docker, quem começa a sessão é o auxiliar do host, npm run

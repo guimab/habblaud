@@ -37,6 +37,10 @@ export interface ServerConfig {
    */
   terminal: boolean;
   /**
+   * Cartões de uso por conta na barra do topo (HABBLAUD_USAGE_CARDS=0 desliga; ver OfficeSnapshot.meta.usageCards).
+   */
+  usageCards: boolean;
+  /**
    * Mensagens pelo escritório (POST /api/messages e a caixa de entrada do plugin habblaud-mensagens) ligadas: a
    * trava do terminal e HABBLAUD_MENSAGENS sem desligar (ver messagesOffReason).
    */
@@ -242,6 +246,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     usageDir: resolve(env.HABBLAUD_USAGE_DIR?.trim() || join(home, '.habblaud', 'usage')),
     allowedHosts: parseAllowedHosts(env.HABBLAUD_ALLOWED_HOSTS),
     terminal: terminalOffReason(env, host, inDocker) === undefined,
+    usageCards: !env.HABBLAUD_USAGE_CARDS?.trim() || isTruthy(env.HABBLAUD_USAGE_CARDS),
     messages: messagesOffReason(env, host, inDocker) === undefined,
     timeline: !env.HABBLAUD_TIMELINE?.trim() || isTruthy(env.HABBLAUD_TIMELINE),
     rootDir,

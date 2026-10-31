@@ -218,7 +218,10 @@ export class UsageCards {
   }
 
   render(): void {
-    const accounts = this.ctx.store.snapshot?.accounts ?? [];
+    const all = this.ctx.store.snapshot?.accounts ?? [];
+    // HABBLAUD_USAGE_CARDS=0 (meta.usageCards): conta sem números não ganha cartão. Serve para contas que nunca
+    // terão as janelas de 5 h/semana (não são do Claude Code nem do Codex): some o "sem dados de uso"/"Como ativar".
+    const accounts = this.ctx.store.snapshot?.meta?.usageCards === false ? all.filter((a) => cardState(a) !== 'empty') : all;
     this.list.sync(accounts);
     this.el.classList.toggle('is-empty', accounts.length === 0);
     setStyleVar(this.el, '--count', String(accounts.length));

@@ -124,6 +124,7 @@ const office = new Office({
   sources: () => late.agents?.sources() ?? [],
   accountName: (id) => accounts.find(id)?.detected.name,
   terminal: config.terminal,
+  usageCards: config.usageCards,
   permissions: () => late.permissions?.snapshot() ?? new Map(),
   messages: config.messages ? () => late.messages?.reachable() ?? new Set() : undefined,
   ptys: () => (late.ptys ? { status: late.ptys.status(), list: late.ptys.list() } : { status: { enabled: false, reason: late.ptyOff ?? tr('desligado') }, list: [] }),

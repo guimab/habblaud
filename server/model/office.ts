@@ -67,6 +67,8 @@ export interface OfficeDeps {
   accountName: (id: string) => string | undefined;
   /** Terminal ligado (ver OfficeSnapshot.meta.terminal e ServerConfig.terminal). */
   terminal?: boolean;
+  /** Cartões de uso por conta na barra do topo (ServerConfig.usageCards; ver OfficeSnapshot.meta.usageCards). */
+  usageCards?: boolean;
   /** Pedidos de permissão pendentes por agente (PermissionRegistry.snapshot), postos no snapshot. */
   permissions?: () => ReadonlyMap<string, PermissionRequestInfo>;
   /**
@@ -1000,6 +1002,7 @@ export class Office {
         version: this.deps.version,
         build: this.deps.build?.(),
         terminal: this.deps.terminal === true,
+        usageCards: this.deps.usageCards !== false,
         messages: this.deps.messages !== undefined,
         ...(ptys ? { pty: ptys.status } : {}),
         updates: this.deps.updates?.(),
