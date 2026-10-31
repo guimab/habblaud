@@ -1510,8 +1510,42 @@ function drawCostume(dc: Dc, costume: CharacterFrameRequest['costume']): void {
     b.vline(x + 4, y + 1, y + 4, '#f9ae48');
     b.vline(x + 8, y + 1, y + 4, '#f9ae48');
     b.hline(x + 2, x + 11, y + 5, '#8d4930');
+  } else if (costume === 'visor') {
+    // Viseira de óptica (cyberpunk): faixa escura na linha dos olhos com a linha de neon ciano e um pino magenta.
+    const dark = '#141926';
+    const glow = '#00e5ff';
+    const haste = '#2a3244';
+    const put = (cx: number, cy: number, col: string) => b.set(x + cx, y + cy, col);
+    if (r.view === 'down') {
+      for (let cx = 2; cx <= 11; cx++) {
+        put(cx, 10, dark);
+        put(cx, 11, cx === 4 || cx === 9 ? '#ff2e88' : glow);
+      }
+      put(1, 10, dark);
+      put(12, 10, dark);
+      put(1, 11, glow);
+      put(12, 11, glow);
+      for (const cx of [0, 13]) {
+        put(cx, 10, haste);
+        put(cx, 11, haste);
+      }
+    } else if (r.view === 'side') {
+      for (let cx = 1; cx <= 4; cx++) {
+        put(cx, 10, dark);
+        put(cx, 11, cx === 2 ? '#ff2e88' : glow);
+      }
+      put(0, 10, haste);
+      put(0, 11, haste);
+      for (let cx = 5; cx <= 8; cx++) put(cx, 10, haste); // haste até a orelha
+    } else {
+      // De costas o rosto não aparece: só a haste e a parte de trás da faixa.
+      for (const cx of [0, 13]) {
+        put(cx, 10, haste);
+        put(cx, 11, dark);
+      }
+    }
   } else {
-    // Gola da capa: rosto e crachá continuam visíveis.
+    // Vampiro: gola da capa; rosto e crachá continuam visíveis.
     b.rect(x, y + 12, 2, 5, '#702743');
     b.rect(x + 12, y + 12, 2, 5, '#702743');
   }

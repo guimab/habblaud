@@ -43,9 +43,9 @@ describe('tema cyberpunk', () => {
     for (const t of ['none', 'christmas', 'halloween'] as const) expect(seasonalFloorTint(t, '#c9d1dc')).toBe('#c9d1dc');
   });
 
-  it('personagem não ganha figurino (o visual é do escritório)', () => {
-    expect(seasonalCostume('cyberpunk', 0)).toBeUndefined();
-    expect(seasonalCostume('cyberpunk', 7)).toBeUndefined();
+  it('todos os personagens ganham a viseira de neon', () => {
+    for (const seed of [0, 7, 1234]) expect(seasonalCostume('cyberpunk', seed)).toBe('visor');
+    expect(seasonalCostume('none', 0)).toBeUndefined();
   });
 });
 

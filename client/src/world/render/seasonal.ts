@@ -22,6 +22,7 @@ function prop(kind: SeasonalProp): Sprite {
 
 export function seasonalCostume(theme: SeasonalTheme, seed: number): CharacterFrameRequest['costume'] {
   if (theme === 'christmas') return 'santa';
+  if (theme === 'cyberpunk') return 'visor';
   if (theme === 'halloween') return (['witch', 'pumpkin', 'vampire'] as const)[(seed >>> 0) % 3];
   return undefined;
 }
