@@ -10,6 +10,16 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Documentação
+
+- **README dos dois idiomas (inglês e português) alinhado com o estado do fork.** Entraram as seções do fork e do
+  driver do Hermes (`HABBLAUD_HERMES_URL`/`HABBLAUD_HERMES_KEY`), Projetos, Fichas de agente, Inbox e runs em segundo
+  plano, Agendas e Consultor; o tema Cyberpunk, o selo "concluiu", o filtro "Só conversa", o contador de sessões e a
+  ficha na gaveta entraram onde faltavam; a tabela de variáveis ganhou `HABBLAUD_HERMES_*`, `HABBLAUD_USAGE_CARDS` e
+  `HABBLAUD_WORLD`, a tabela de rotas ganhou `/api/projects`, `/api/cards`, `/api/inbox`, `/api/runs`, `/api/schedules`,
+  `/api/consult` e `/api/access`, e as partes do original que não valem aqui (verificação de versão nova,
+  `npm run release`, World ligado por padrão, clone do repositório original) foram corrigidas.
+
 ### Adicionado
 
 - **Selo "concluiu" na lista de agentes: dá para saber quem terminou sem ter ficado olhando a tela.** Quando o turno

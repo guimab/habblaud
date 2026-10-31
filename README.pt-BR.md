@@ -1,6 +1,7 @@
-> **Fork local divergente** de marmottajr/habblaud: virou a central de agentes do Hermes (fichas, Inbox, agendas).
+> **Fork divergente** de [marmottajr/habblaud](https://github.com/marmottajr/habblaud): virou a central de trabalho
+> dos agentes do **Hermes** (projetos, fichas de agente, Inbox com runs em segundo plano, agendas e Consultor).
 > Não recebe nem publica releases; a verificação de versão nova e o Habblaud World ficam desligados. As instruções
-> abaixo que citam o GitHub original são do projeto de origem.
+> abaixo que citam o repositório original são do projeto de origem.
 
 <p align="center">
   <img src="client/public/assets/brand/logo-mark@4x.png" width="96" alt="Logo do Habblaud: um pequeno prédio em pixel art" />
@@ -9,7 +10,7 @@
 <h1 align="center">Habblaud</h1>
 
 <p align="center">
-  <b>O escritório virtual dos seus agentes do Claude Code (e do Codex).</b><br />
+  <b>O escritório virtual dos seus agentes do Hermes (e do Claude Code e do Codex).</b><br />
   Cada projeto vira uma sala, cada agente vira um personagem em pixel art que mostra, em tempo real, o que está fazendo.
 </p>
 
@@ -29,20 +30,31 @@
 
 ---
 
-Você abre o Claude Code em vários projetos, dispara subagentes, deixa tarefas rodando… e perde a noção de quem está
-fazendo o quê. O **Habblaud** transforma isso num escritório que dá para entender de relance: quem está digitando,
-quem levantou a mão porque **precisa de você**, quem entregou o trabalho e foi embora, quem foi tomar um café
-enquanto espera a próxima instrução — e quanto de cada conta você já gastou na sessão de 5 horas e na semana.
+Você abre o Claude Code, o Codex ou um agente do Hermes em vários projetos, dispara subagentes, deixa tarefas
+rodando… e perde a noção de quem está fazendo o quê. O **Habblaud** transforma isso num escritório que dá para
+entender de relance: quem está digitando, quem levantou a mão porque **precisa de você**, quem entregou o trabalho e
+foi embora, quem foi tomar um café enquanto espera a próxima instrução — e quanto de cada conta do Claude Code você
+já gastou na sessão de 5 horas e na semana. Com um Hermes configurado ([Hermes: o driver](#hermes-o-driver)) o
+escritório também **age**: fichas, runs em segundo plano, aprovações e agendas.
 
 E quando dois ou mais agentes estão à toa, o escritório ganha **vida social**: cada um tem personalidade própria, e
 eles veem futebol juntos no lounge, jogam videogame e ping-pong, fofocam na copa, se arrumam no espelho e apostam
 moedinhas no jokenpô. Veja em [Vida social](#vida-social).
 
-Tudo roda na sua máquina, lendo os arquivos que o próprio Claude Code já grava (e só as linhas `alias` do seu shell,
-para dar a letra de cada conta). Nada sai do computador: o Habblaud não lê credenciais nem faz chamadas externas.
+Tudo roda na sua máquina, lendo os arquivos que os próprios agentes já gravam (e, no Claude Code, só as linhas
+`alias` do seu shell, para dar a letra de cada conta). Nada sai do computador, com uma única exceção: com o driver do
+Hermes configurado, o que você manda pelo escritório vai para a **sua** API do Hermes (`HABBLAUD_HERMES_URL`). O
+Habblaud não lê credenciais.
 
 ## Sumário
 
+- [O que é este fork](#o-que-é-este-fork)
+- [Hermes: o driver](#hermes-o-driver)
+- [Projetos](#projetos)
+- [Fichas de agente](#fichas-de-agente)
+- [Inbox e runs em segundo plano](#inbox-e-runs-em-segundo-plano)
+- [Agendas](#agendas)
+- [Consultor](#consultor)
 - [Como é](#como-é)
 - [Instalação](#instalação)
 - [Como usar](#como-usar)
@@ -56,6 +68,123 @@ para dar a letra de cada conta). Nada sai do computador: o Habblaud não lê cre
 - [Aviso](#aviso)
 - [Licença](#licença)
 - [Vida social](#vida-social)
+
+## O que é este fork
+
+Um **fork divergente** de [marmottajr/habblaud](https://github.com/marmottajr/habblaud). O escritório, o pixel art, a
+vida social e o suporte a Claude Code/Codex continuam iguais; o que muda é o ponto de vista: aqui o escritório é a
+**central de trabalho dos agentes do Hermes** — projetos, fichas de agente, uma Inbox única com runs em segundo plano,
+agendas e o painel do Consultor, tudo por um contrato de driver.
+
+```bash
+git clone https://github.com/guimab/habblaud.git
+cd habblaud
+npm install
+npm run docker:up        # ou: npm run build && npm start
+```
+
+Depois aponte-o para o seu Hermes ([Hermes: o driver](#hermes-o-driver)). Sem isso, o escritório é **observação
+somente leitura** das sessões que as fontes de arquivo enxergam, como no projeto de origem.
+
+**O que este fork não tem:**
+
+- **Não tem releases nem verificação de versão nova.** O `package.json` não tem o campo `repository`, então a
+  verificação (`server/updates/checker.ts`) não tem o que consultar, o selo **Nova versão** nunca aparece (o
+  `HABBLAUD_UPDATE_CHECK` não muda nada aqui) e o `npm run release` não existe mais. Para atualizar, `git pull` no
+  seu clone.
+- **Habblaud World desligado.** É a cidade online do projeto original (`server.habblaud.com`): o código continua aqui,
+  mas nada sai do computador a menos que você ponha `HABBLAUD_WORLD=1`. A seção [Habblaud World](#habblaud-world)
+  abaixo descreve o recurso do original.
+
+## Hermes: o driver
+
+Duas variáveis, no `.env` (Docker) ou no ambiente (Node):
+
+| Variável | Exemplo | Para que |
+| --- | --- | --- |
+| `HABBLAUD_HERMES_URL` | `http://127.0.0.1:8642` | Endereço base do servidor de API do Hermes. |
+| `HABBLAUD_HERMES_KEY` | a `API_SERVER_KEY` do Hermes | Token de autorização dessa API. |
+
+Com **as duas**, o escritório **age** sobre sessões do Hermes: abre sessão, conversa, aprova, redireciona e para. Com
+uma faltando, nada disso aparece na interface — sem Consultor, sem fichas, sem Inbox, sem agendas — e o log diz que o
+Consultor está desligado.
+
+- **Contrato, não acoplamento.** O escritório só conhece [`server/drivers/contract.ts`](server/drivers/contract.ts)
+  (capacidades, eventos de conversa, estados de run); [`server/drivers/hermes/client.ts`](server/drivers/hermes/client.ts)
+  traduz para a API do Hermes. O driver do Hermes declara `chat`, `create`, `approve`, `steer` e `stop`; framework que
+  não declara uma capacidade simplesmente não ganha aquele botão.
+- **Que sessão aceita turno.** Só sessão de fonte `api_server` ou `bot_room`. Sessão de TUI, Telegram ou CLI entra como
+  **convidado**: só leitura, e pode ser adotada por uma ficha (adotar não a torna escrevível — a API do Hermes recusa
+  turno vindo de outra superfície).
+- **Observar o Hermes.** O escritório continua lendo os arquivos de sempre (o formato do Claude Code: `sessions/` e
+  `projects/`); as sessões do Hermes chegam ali por um adaptador que grava esses mesmos arquivos. **Esse adaptador não
+  vive neste repositório** (na instalação de referência é `~/.habblaud-hermes`, com o serviço `habblaud-hermes-source`);
+  o que este repositório documenta é o formato que ele precisa gravar
+  ([`server/README.md`](server/README.md#fontes-de-dados-somente-leitura)) mais o campo extra `hermesSession` em
+  `sessions/<pid>.json` — é ele que liga o personagem ao id da sessão do Hermes e é o que faz **Mandar mensagem**
+  funcionar, por `POST /api/mod/inbox`.
+- **Run sobrevive ao painel.** Turno começado pelo escritório vai por `POST /v1/runs`: o Hermes roda sem ninguém
+  assistindo, então fechar o painel ou reiniciar o escritório não mata o trabalho. Veja
+  [Inbox e runs em segundo plano](#inbox-e-runs-em-segundo-plano).
+
+## Projetos
+
+Sala é **projeto** (`projects.json` no diretório de dados): nome, zero ou mais pastas, contexto fixo e modelo padrão.
+Várias pastas podem viver na mesma sala, e pasta que não pertence a nenhum projeto continua virando sala sozinha,
+como antes.
+
+- **Novo projeto** (painel lateral) cria o projeto **e a primeira ficha** dele: nome do projeto, pasta opcional e o
+  nome do primeiro agente — projeto sem ficha não teria o que clicar depois.
+- Na sala: **Transformar em projeto**, **Juntar com…**, **Desfazer projeto** e **Contexto do projeto** (esse texto vai
+  aos agentes do projeto em todo turno).
+
+## Fichas de agente
+
+O `agents.json` guarda a identidade durável: **nome, papel, projeto, instruções, modelo, personagem e as sessões que
+pertencem a ela**. A ficha existe sem nada rodando — sem sessão viva ela aparece **Dormindo** na sala do seu projeto
+(em **Sem projeto** quando não tem projeto), com o próprio personagem, sempre a mesma pessoa.
+
+- **Instruções e contexto do projeto** vão como `system_message` em todo turno: o `system_prompt` da criação da sessão
+  é aceito mas ignorado nos turnos seguintes (medido contra o Hermes real, não suposto).
+- **Adotar em… / Soltar sessão:** dá nome, papel e instruções fixas a uma sessão convidada — e desfaz (a sessão
+  continua no Hermes, só deixa de ser do agente).
+- **Promover a agente…:** transforma uma consulta do Consultor numa ficha num projeto.
+- Alterar fichas exige a feature `agents` na porta do celular (`HABBLAUD_REMOTE_ALLOW`).
+
+## Inbox e runs em segundo plano
+
+Todo turno começado pelo escritório é um **run** (`runs.json`): segue sem ninguém assistindo, é retomado de onde parou
+quando o escritório reinicia, e só existe um run por sessão (o segundo leva `409`).
+
+- **Inbox** (botão na barra do topo, tecla `I`): aprovações, pedidos de permissão, perguntas, respostas e erros de
+  todos os agentes num lugar. Aprovar, dispensar ou abrir a conversa; **Limpar** tira respostas, erros e interrompidos
+  e mantém as aprovações; ⏰ marca o que veio de agenda.
+- **Redirecionar** (`steer`) e **Parar** tomam o lugar do Enviar enquanto um run está ativo. Run parado ou cancelado é
+  *interrompido*, não falha.
+- **Aprovar** é mandar ao Hermes exatamente `{request_id, execution_generation, choice}` (a `execution_generation` vem
+  da projeção do run): a escolha sozinha nunca aprova, e o escritório mostra a recusa da API como `502`.
+- **A Inbox só sabe do que o próprio escritório começou.** Turno dado na mesma sessão por outra superfície (TUI,
+  dashboard, Telegram) não cria nem limpa item — o escritório não relê a sessão para isso.
+
+## Agendas
+
+Na ficha, a seção **Agendas** marca quando ela trabalha sozinha: **uma vez** (data e hora), **a cada N minutos/horas**
+(mínimo de 5 minutos) ou **nos dias da semana escolhidos, num horário**. Na hora, a mensagem vai para a sessão atual
+da ficha como run em segundo plano, e a resposta cai na Inbox com ⏰.
+
+- Ficha **ocupada** (run ativo) tem a vez pulada e registrada — não há fila.
+- Com o escritório desligado na hora, atraso de até **6 h** roda uma vez quando ele volta; mais que isso é registrado
+  como perdida e a agenda segue para a próxima. Agenda "uma vez" se desliga sozinha depois de rodar.
+- Os horários são no **fuso do servidor** (`TZ`, mostrado na tela).
+- É o agendador do próprio escritório, não o `/api/jobs` do Hermes: cada job do Hermes abre sessão nova (sem memória
+  da ficha) e entrega fora da Inbox.
+- Apagar a ficha apaga as agendas dela.
+
+## Consultor
+
+O **Consultor** (`C`) abre uma pergunta rápida numa **sessão nova do Hermes**, com contexto livre opcional ("quem você
+é, o que está fazendo, o que importa") e uma caixa para incluir o que você está vendo (agente ou sala selecionados).
+Ele arquiva sozinho depois de 30 minutos ocioso, e pode ser promovido a ficha num projeto (**Promover a agente…**).
 
 ## Como é
 
@@ -129,15 +258,17 @@ ela, e o endereço antigo apaga e é desmontado. Assim o prédio não fica com b
 
 ### Requisitos
 
-- **macOS** (testado) ou Linux.
-- **[Claude Code](https://code.claude.com)** instalado, com uma ou mais contas (2.1.287 ou mais novo para o mod).
+- **macOS** (testado) ou Linux (este fork é desenvolvido no Linux).
+- **[Claude Code](https://code.claude.com)** instalado, com uma ou mais contas (2.1.287 ou mais novo para o mod), para
+  as fontes do Claude Code — e/ou o **Codex**, e/ou um **Hermes** (veja [Hermes: o driver](#hermes-o-driver) para os
+  recursos do Hermes: fichas, Inbox, agendas, Consultor).
 - **Node.js 22.12+** e **npm** (desenvolvido com o Node 24; o Docker já usa o Node 24).
 - **Docker Desktop** (ou Docker Engine com Compose v2), se for rodar em container.
 
 ### 1. Baixe o projeto
 
 ```bash
-git clone https://github.com/marmottajr/habblaud.git
+git clone https://github.com/guimab/habblaud.git
 cd habblaud
 npm install
 ```
@@ -271,8 +402,9 @@ credenciais › Instalar certificado › Certificado de CA), conferindo a impres
 - **Endereço próprio** (ex.: `meuclaude.home`): entra no certificado, mas o celular só o encontra com uma entrada no
   DNS do roteador apontando para o IP do computador. O `<nome>.local` funciona sem configurar nada.
 - **O que o celular pode fazer:** por padrão, aprovar e recusar pedidos de permissão. `HABBLAUD_REMOTE_ALLOW` no
-  `.env` aceita `permissions`, `messages`, `terminal` e `spawn`, separados por vírgula, ou `none` (só ver). O
-  terminal interativo nunca funciona pelo celular.
+  `.env` aceita `permissions`, `messages`, `terminal`, `spawn`, `projects`, `agents` (fichas, Inbox e runs) e
+  `consult` (Consultor), separados por vírgula, ou `none` (só ver). O terminal interativo nunca funciona pelo
+  celular.
 - **Entregas** (celular, com `terminal` liberado): o botão da caixinha no topo lista o que cada agente terminou, com
   resumo e anexos (prints, PDFs, arquivos que ele mandou) que abrem com um toque.
 - **Novo agente** (botão **+**): começa uma sessão do Claude Code em segundo plano no computador (`claude --bg`, na
@@ -302,11 +434,11 @@ rede). No modo Node: `HABBLAUD_REMOTE_PORT` e `HABBLAUD_REMOTE_HOST` (padrão `0
 
 ### Atualizar
 
-A versão em uso aparece na barra superior, ao lado de "Conectado", e em **Configurações › Sobre**. A cada 6 horas o
-Habblaud confere no GitHub se saiu uma versão nova (as [releases](https://github.com/marmottajr/habblaud/releases)
-deste repositório). Quando sai, aparece o selo verde **Nova versão** no lugar do número, com um aviso e um ponto no
-botão de configurações. Em **Sobre** ficam o link do que mudou e o botão **Verificar agora** (as notas de cada
-versão também estão no [`CHANGELOG.md`](CHANGELOG.md)). Para atualizar:
+A versão em uso aparece na barra superior, ao lado de "Conectado", e em **Configurações › Sobre**. **Neste fork não
+existe verificação de versão nova**: o `package.json` não tem o campo `repository`, então não há o que consultar, o
+selo verde **Nova versão** nunca aparece (o `HABBLAUD_UPDATE_CHECK` não faz diferença aqui) e o `npm run release` não
+existe. As notas de cada versão continuam no [`CHANGELOG.md`](CHANGELOG.md). Para atualizar, no seu clone **deste
+fork**:
 
 ```bash
 git pull
@@ -320,7 +452,7 @@ npm run docker:up        # ou: npm run build && npm start (e depois npm run mod:
 
 O `docker:up` também atualiza o mod nas contas em que ele já está instalado (nunca instala sozinho) e avisa:
 "Mod atualizado para 0.3.0 na Conta D; sessões abertas: /reload-plugins". No modo Node, rode `npm run mod:install`
-depois de atualizar. Para não consultar o GitHub, use `HABBLAUD_UPDATE_CHECK=0` (no `.env`, para o Docker).
+depois de atualizar. (Neste fork não há consulta ao GitHub para desligar: veja [Atualizar](#atualizar).)
 
 #### Vindo do CodeTown
 
@@ -371,18 +503,28 @@ desinstaladores antigos deixam cópias `settings.json.habblaud-backup-<data>` na
 | **Esperando o shell** | Terminou o turno mas deixou um comando rodando (testes, build, deploy…), então fica na mesa com uma ampulheta virando sobre a cabeça e o terminal em progresso: come pipoca assistindo, depois de 3 min cruza os braços e gira na cadeira, depois de 10 min junta teia de aranha e depois de 25 min cochila; quando o comando termina, levanta e comemora com confete (ou ganha uma nuvem de chuva, se falhou). Depois de 40 s, se houver colegas à toa, pode sair para uma roda — com a ampulheta na cabeça. |
 | **Ocioso** | Terminou o turno e passeia: café na copa, bebedouro, banheiro, sofá do lounge, celular no puff, espelho. Com colegas à toa, entra numa roda: TV, videogame, ping-pong, papo na copa, jokenpô (veja [Vida social](#vida-social)). Depois de 10 min parado, cochila — mas um colega pode acordá-lo para uma roda. |
 | **Subagente concluído** | Vai até o agente que o chamou, entrega o resultado e sai pelo elevador. |
+| **Dormindo** | Ficha sem sessão aberta (este fork): fica na sala do projeto, cochilando, com o selo **Dormindo**. Clique nele para abrir a ficha e começar uma conversa. |
+| **Concluído** | Terminou um turno e você ainda não viu: o nome dele na lista ganha o selo **concluiu** (ou **falhou**) e o topo conta em **concluíram**. O selo sai quando você abre o agente, e a marca de "já vi" fica gravada no servidor (`finished.json`), então recarregar a página não traz o selo de volta. |
 | **Sessão encerrada** | Vai embora; se era o último da sala, apaga a luz antes de sair. |
 
 Cada personagem tem um **nome brasileiro único** (Marina, Henrique, Luan…) que se mantém enquanto a sessão existir, e
-um **chip colorido com a letra da conta** (C, D…).
+um **chip colorido com a letra da conta** (C, D…). Neste fork, agente com **ficha** mantém o mesmo nome e o mesmo
+personagem em toda execução — a ficha é a identidade, a sessão é só uma execução dela.
 
 ### Interface
 
-- **Topo:** contadores (salas, agentes, trabalhando, subagentes, shells rodando, precisam de você) e um cartão de
-  **uso por conta**. O de shells só aparece enquanto algum comando está rodando; clique nele para ir até quem espera.
+- **Topo:** contadores (salas, **sessões**, trabalhando, subagentes, shells rodando, precisam de você,
+  **concluíram**), o botão da **Inbox** (tecla `I`) e um cartão de **uso por conta**. Os contadores contam **sessões**
+  — cada execução —, não fichas; o de "concluíram" conta quem terminou um turno e você ainda não abriu. O de shells
+  só aparece enquanto algum comando está rodando; clique nele para ir até quem espera.
   Embaixo do logo ficam a conexão e a versão em uso, que vira o selo **Nova versão** quando sai uma versão nova (veja
   [Atualizar](#atualizar)).
-- **Painel lateral:** busca, filtro por conta e a lista de salas com seus agentes e subagentes.
+- **Painel lateral:** busca, filtro por conta, a lista de salas com seus agentes e subagentes e o formulário
+  **Novo projeto** (o projeto e a primeira ficha dele, veja [Projetos](#projetos)).
+- **Ficha do agente:** um agente dormindo — ou `/?agent=card:<id>` — abre a ficha: nome, papel, projeto, instruções,
+  modelo, personagem, **Conversar**, **Nova conversa**, **Agendas** e **Apagar ficha**.
+- **Conversas:** a gaveta lista o que cada agente fez — pedido, resposta, estado e hora — do mais recente ao mais
+  antigo (o pedido fica gravado junto do run).
 - **Gaveta de detalhes:** clique num personagem (no prédio ou na lista) para ver atividade, tarefas, subagentes,
   linha do tempo e estatísticas (ferramentas, tokens, custo, linhas alteradas, modelo, branch).
 - **Feed:** as últimas atividades de todo o escritório.
@@ -393,9 +535,9 @@ um **chip colorido com a letra da conta** (C, D…).
 
 **Câmera:** arraste para mover, role para dar zoom, clique duplo num personagem para segui-lo.
 
-**Atalhos:** `/` busca · `F` seguir o selecionado · `T` terminal · `L` timelapse · `M` meu dia · `P` próximo pedido
-(permissão ou pergunta) · `O` ou `0` visão geral · `Esc` limpar seleção · `[` painel lateral · `]` feed · setas/`WASD` mover ·
-`+` `-` zoom · `?` ajuda.
+**Atalhos:** `/` busca · `F` seguir o selecionado · `T` terminal · `C` consultor · `I` Inbox · `L` timelapse ·
+`M` meu dia · `P` próximo pedido (permissão ou pergunta) · `O` ou `0` visão geral · `Esc` limpar seleção ·
+`[` painel lateral · `]` feed · setas/`WASD` mover · `+` `-` zoom · `?` ajuda.
 
 ### Temas do escritório
 
@@ -406,6 +548,10 @@ Em **Configurações → Aparência → Tema do escritório**, escolha:
 - **Nenhum**: sempre o visual original.
 - **Natal**: guirlandas, luzes quentes, árvores com presentes, tapetes natalinos, neve nas janelas e gorros nos personagens.
 - **Halloween**: abóboras, fantasmas decorativos, teias, morcegos, luzes roxas, tapetes temáticos e acessórios de fantasia.
+- **Cyberpunk** (este fork): o escritório escuro com neon — paredes e piso escuros, neon no alto, chuva nas janelas,
+  rack de servidores, máquina de venda iluminada, luminária de tubo de neon, fliperama de neon e um quiosque
+  holográfico no lugar das plantas, além de viseira de óptica nos personagens. É escolha fixa (o automático nunca usa)
+  e fica melhor com o ciclo dia/noite em **Sempre noite**.
 
 A troca é imediata e a escolha fica salva neste navegador. Os temas preservam os caminhos,
 as atividades e as animações dos agentes. O ciclo dia/noite continua sendo uma opção independente.
@@ -454,8 +600,8 @@ estiver ocupado, entra quando ele terminar o que está fazendo. Subagentes e ses
   diferenciar maiúsculas nem acentos. O contador mostra a posição ("3/17"); `Enter` e `Shift+Enter` vão para o próximo
   e o anterior, abrindo os blocos recolhidos ("… +N linhas") onde o termo estiver. A busca continua valendo enquanto
   chegam mensagens novas. `Esc` fecha a busca; o seguinte fecha o terminal.
-- **Filtro:** **Tudo**, **Só prompts** (os seus prompts e as respostas finais do agente, sem os passos intermediários)
-  ou **Sem ferramentas**.
+- **Filtro:** **Só conversa** (o padrão deste fork: as suas mensagens e as respostas finais do agente, sem comandos
+  de barra, modo bash, ferramentas, resultados, raciocínio ou eventos da sessão), **Tudo** ou **Sem ferramentas**.
 - **Copiar:** passe o mouse (ou o foco) sobre um prompt, uma resposta, um comando ou um resultado para copiá-lo.
 - **Histórico:** o relógio da barra superior lista as sessões dos últimos 7 dias de todas as contas (até 150), agrupadas
   por dia, com busca por título, projeto ou conta. Uma sessão encerrada abre no terminal com projeto, título e data no
@@ -675,6 +821,10 @@ alias d='CLAUDE_CONFIG_DIR=~/.claude-conta2 claude'
 
 vira **Conta C** e **Conta D**. Só valem atalhos de até 3 letras; contas sem atalho recebem A, B…
 
+**Um Hermes também aparece como conta**, quando os arquivos das sessões dele são gravados numa pasta nesse mesmo
+formato e essa pasta é uma das observadas (`HABBLAUD_CLAUDE_DIRS`): a letra e o nome saem do `HABBLAUD_ACCOUNTS` e o
+cartão de uso se desliga com `HABBLAUD_USAGE_CARDS=0` (o Hermes não tem janela de 5 horas/semanal).
+
 **De onde vêm os números.** O jeito recomendado é o mod do Habblaud (`npm run mod:install`, Claude Code 2.1.287+):
 dentro de cada sessão, ele recebe do próprio Claude Code os limites do plano e guarda só os percentuais de 5 horas e
 da semana (e quando reiniciam) em `~/.habblaud/usage/<conta>.json`. Os números chegam depois da próxima resposta de
@@ -723,17 +873,22 @@ Tudo funciona sem configurar nada. Se precisar ajustar, use variáveis de ambien
 | `HABBLAUD_TERMINAL` | ligado (só com acesso local) | `0` desliga o terminal, responder e mandar mensagens pelo escritório e o editor de personagem. Com a porta exposta eles já ficam desligados, sem opção de ligar. |
 | `HABBLAUD_PTY` | desligado | `1` liga o terminal interativo (abrir, assumir e encerrar sessões do Claude Code pelo escritório; só com acesso local e fora do Docker) e o **Novo agente** (também no Docker, pelo `npm run codex:bridge`). Leia o aviso em [Privacidade e segurança](#privacidade-e-segurança). |
 | `HABBLAUD_CLAUDE_BIN` | `claude` do PATH | O executável do Claude Code que o terminal interativo e o Novo agente rodam. |
-| `HABBLAUD_REMOTE_ALLOW` | `permissions` | O que o [celular com login](#celular-com-login-e-https-aprovando-pedidos) pode fazer: `permissions`, `messages`, `terminal`, `spawn` (separados por vírgula) ou `none`. Os outros `HABBLAUD_REMOTE_*` são escritos pelo `npm run remote:setup`. |
+| `HABBLAUD_REMOTE_ALLOW` | `permissions` | O que o [celular com login](#celular-com-login-e-https-aprovando-pedidos) pode fazer: `permissions`, `messages`, `terminal`, `spawn`, `projects`, `agents`, `consult` (separados por vírgula) ou `none`. Os outros `HABBLAUD_REMOTE_*` são escritos pelo `npm run remote:setup`. |
 | `HABBLAUD_MENSAGENS` | ligado (com o terminal) | `0` desliga só as mensagens pelo escritório (a caixa no terminal e nos detalhes do agente). |
 | `HABBLAUD_CODEX` | ligado | `0` desliga o Codex no escritório. |
 | `HABBLAUD_CODEX_DIRS` | detecção automática | Pastas do Codex, separadas por vírgula (no lugar de `~/.codex*` e `CODEX_HOME`). |
 | `HABBLAUD_CODEX_BIN` | `codex` do PATH (no Windows, `codex.exe`) | O binário do Codex que entrega as mensagens (`codex queue`), no modo Node ou no `npm run codex:bridge`. |
-| `HABBLAUD_UPDATE_CHECK` | ligado | `0` desliga a verificação de versão nova (uma consulta às releases do repositório no GitHub a cada 6 h). |
+| `HABBLAUD_UPDATE_CHECK` | ligado (sem efeito aqui) | `0` desliga a verificação de versão nova (uma consulta às releases do repositório no GitHub a cada 6 h). **Neste fork ela nunca roda**: não há `repository` no `package.json`, então não há o que consultar. |
 | `HABBLAUD_LANG` | idioma do sistema (menos inglês), senão `pt-BR` | Idioma dos textos montados pelo servidor (atividades, avisos, logs): `pt-BR`, `en`, `es` ou `fr`. A interface segue o navegador ou a escolha em Configurações › Idioma. Ver [Idiomas](#idiomas). |
 | `HABBLAUD_ACCOUNTS` | — | JSON para personalizar nome, letra ou cor, casado pelo nome da pasta da conta. Ex.: `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
+| `HABBLAUD_HERMES_URL` | — | Endereço base do servidor de API do Hermes (ex.: `http://127.0.0.1:8642`). Sem ele e sem a chave, o escritório só observa. |
+| `HABBLAUD_HERMES_KEY` | — | Token de autorização dessa API (a `API_SERVER_KEY` do Hermes). No Docker, as duas vão no `.env`. |
+| `HABBLAUD_USAGE_CARDS` | ligado | `0` desliga os cartões de uso por conta na barra do topo (escritório só com contas do Hermes não tem números de 5 horas/semana para mostrar). |
+| `HABBLAUD_WORLD` | **desligado (este fork)** | `1` liga o Habblaud World do projeto original. Sem ele não existe rota `/api/world/*` e nada do seu escritório sai do computador. |
 
 **No Docker**, valem `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
-`HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY`, os `HABBLAUD_WORLD*` e os
+`HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY`, `HABBLAUD_USAGE_CARDS`,
+`HABBLAUD_HERMES_URL`, `HABBLAUD_HERMES_KEY`, os `HABBLAUD_WORLD*` e os
 `HABBLAUD_REMOTE_*` (no `.env` ou no ambiente) e `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` e
 `HABBLAUD_ACCOUNTS` (lidas pelo `docker:up` no host); as demais ficam fixas dentro do container. Opções: `npm run docker:up -- --no-build` (sobe sem reconstruir),
 `npm run docker:down` (para) e `npm run docker:logs` (acompanha os logs).
@@ -741,7 +896,8 @@ Tudo funciona sem configurar nada. Se precisar ajustar, use variáveis de ambien
 ## Habblaud World
 
 O Habblaud World é uma cidade online em pixel art onde cada Habblaud vira um prédio, aceso ao vivo enquanto os agentes
-trabalham, e cada pessoa passeia com um personagem. **Vem ligado por padrão**, apontando para `server.habblaud.com`;
+trabalham, e cada pessoa passeia com um personagem. É o **serviço do projeto original** (`server.habblaud.com`): neste
+fork ele vem **desligado** (`HABBLAUD_WORLD=1` liga), e, ligado,
 **nada sai do computador até você criar a conta** e entrar, e `HABBLAUD_WORLD=0` desliga tudo. O acesso é liberado por
 lista de espera.
 
@@ -752,7 +908,7 @@ conta fica só aqui, em `~/.habblaud/world.json` (permissão 600; no Docker, no 
 | Variável | Padrão | Para quê |
 | --- | --- | --- |
 | `HABBLAUD_WORLD_URL` | `https://server.habblaud.com` | Endereço do servidor do mundo, só `https://` ou `wss://` (sem caminho). |
-| `HABBLAUD_WORLD` | ligado | `0` desliga tudo do World (rotas e interface) e nada sai do computador. |
+| `HABBLAUD_WORLD` | **desligado neste fork** (ligado no original) | `1` liga o World (rotas e interface); `0`/ausente desliga tudo e nada sai do computador. |
 | `HABBLAUD_WORLD_DEV` | desligado | `1` aceita um servidor do mundo local sem TLS: `http://127.0.0.1:<porta>` (o `npm run dev` já aceita) ou, de dentro do Docker, `http://host.docker.internal:<porta>`. |
 
 **Privacidade.** Nada do seu trabalho sai do computador. Do prédio saem só o tema, um andar por sala aberta (com um
@@ -863,6 +1019,9 @@ Como a seção fica, no modo demonstração (`?mock=1&world=logged_out`, `waitin
   agente que os chamou.
 - **GitHub:** PRs, pushes, CI e releases saem das mesmas linhas do transcript (o comando e a saída dele, ou o
   `gitOperation` que o próprio Claude Code grava); nada é consultado no GitHub.
+- **Agir sobre uma sessão do Hermes (este fork):** o escritório continua observando os arquivos, mas criar sessão,
+  conversar, aprovar, redirecionar e parar saem do servidor como chamadas à API do Hermes (`HABBLAUD_HERMES_URL`), pelo
+  driver (`server/drivers`) — nada é escrito na pasta de configuração de ninguém.
 - **O desenho:** o navegador recebe o estado por SSE e desenha tudo num canvas — personagens, móveis, pisos e paredes
   são pixel art **gerada por código**; já o logotipo, as ilustrações e os quadros das paredes foram gerados com IA.
 
@@ -900,6 +1059,15 @@ mod/      o mod do Habblaud e os plugins de permissões e de mensagens (plugins 
 | `POST /api/codex/events` | Eventos dos hooks do Codex (sessão aberta, ferramenta, aprovação, fim do turno). Só com acesso local. |
 | `/api/codex/bridge/poll` e `/ack` | O `npm run codex:bridge` busca as mensagens para o Codex e confirma a entrega. Só com acesso local. |
 
+| `GET\|POST /api/projects`, `GET\|PATCH\|DELETE /api/projects/:id` | Projetos (salas): pastas, contexto fixo, modelo padrão. Mudanças exigem a feature `projects` na porta do celular. |
+| `GET\|POST /api/cards`, `GET\|PATCH\|DELETE /api/cards/:id`, `POST /api/cards/:id/adopt` e `/release` | Fichas de agente: identidade, instruções, modelo, personagem e sessões adotadas. Mudanças exigem `agents`. |
+| `GET /api/inbox`, `POST /api/inbox/:id {action: dismiss\|approve, choice}`, `POST /api/inbox/dismiss-all` | A Inbox única: aprovações, perguntas, respostas e erros de todos os agentes. Mudanças exigem `agents`. |
+| `GET /api/runs`, `GET /api/runs/:id`, `GET /api/runs/:id/events` | Runs em segundo plano: lista, estado atual e a conversa (SSE, retomável pelo último evento). |
+| `POST /api/runs/:id/steer` e `/stop` | Redirecionar (nova orientação) e parar um run em andamento. |
+| `GET\|POST /api/consult`, `POST /api/consult/:id/messages`, `DELETE /api/consult/:id` | Consultor: abre sessão, acompanha a resposta em stream e arquiva a conversa. Exige `consult` no celular. |
+| `GET\|POST /api/schedules`, `PATCH\|DELETE /api/schedules/:id`, `POST /api/schedules/:id/run` | Agendas de uma ficha. Mudanças exigem `agents`. |
+| `GET /api/access` | O que este acesso pode fazer: local ou remoto, e quais features (permissions, messages, terminal, spawn, projects, agents). |
+
 Mais detalhes do servidor em [`server/README.md`](server/README.md).
 
 </details>
@@ -936,12 +1104,11 @@ das contas (letra, e-mail, organização) são lidos no host pelo `docker:up` e 
   pasta: o que estiver nela (inclusive depois de um `git pull`) é o que roda. O plugin de mensagens
   (`habblaud-mensagens`) é separado justamente porque age: digita na sessão o que você mandou pelo escritório.
 - **Só local, por padrão:** o servidor só aceita conexões do próprio computador; liberar a rede local é opcional.
-  Não há telemetria. A única chamada externa é a verificação de versão nova: a cada 6 horas, uma consulta anônima,
-  sem token, à API pública do GitHub (`api.github.com/repos/marmottajr/habblaud/releases/latest`). Ela não envia nada
-  sobre as suas sessões; o GitHub vê só o seu IP e a versão em uso, que vai no `User-Agent`.
-  `HABBLAUD_UPDATE_CHECK=0` desliga a consulta.
-  O [Habblaud World](#habblaud-world) (ligado por padrão) só manda algo ao servidor do mundo depois de você criar a
-  conta e entrar, e só o que está em [o que sai](docs/world/privacidade.md); `HABBLAUD_WORLD=0` desliga tudo.
+  Não há telemetria. **Neste fork não existe verificação de versão nova** (sem `repository` no `package.json`, não há o
+  que consultar): a única chamada de saída é a que você configura — a API do Hermes em `HABBLAUD_HERMES_URL`, com a
+  sua chave. O [Habblaud World](#habblaud-world) fica **desligado** aqui e liga com `HABBLAUD_WORLD=1`; só então, e
+  só depois de criar a conta e entrar, alguma coisa do seu escritório sai, e só o que está em
+  [o que sai](docs/world/privacidade.md).
   O [celular com login](#celular-com-login-e-https-aprovando-pedidos) também, e ele só existe depois do `npm run remote:setup`.
 - **Sem credenciais:** o Habblaud não lê senhas nem tokens de acesso. Do `.claude.json` de cada conta aproveita só o
   e-mail, a organização e o cache do `/usage`; o uso ao vivo vem do mod (ou do tap de statusline).
@@ -1009,6 +1176,14 @@ das contas (letra, e-mail, organização) são lidos no host pelo `docker:up` e 
   outros apps ficam no mesmo lugar) e grava `~/.habblaud/codex-hook.json`; a aprovação dos hooks é sempre sua, em
   `/hooks`. Os hooks só falam com `127.0.0.1`. As mensagens ao Codex têm o mesmo aviso das do Claude Code: qualquer
   programa desta máquina que fale com o Habblaud consegue deixar uma mensagem na fila de uma sessão.
+- **Driver do Hermes, opt-in:** só existe com `HABBLAUD_HERMES_URL` e `HABBLAUD_HERMES_KEY` definidas. A chave fica no
+  servidor (nunca chega ao navegador, e o driver a mascara em qualquer texto que repasse). O que sai do servidor é o
+  que você mandou pelo escritório — a sua mensagem, as instruções da ficha e o contexto do projeto — para a **sua**
+  API do Hermes; nada vai para outro lugar.
+- **Arquivos de dados do escritório:** `names.json`, `projects.json`, `agents.json`, `runs.json` (os seus pedidos e as
+  respostas dos agentes), `inbox.json`, `schedules.json` e `finished.json` são gravados em `HABBLAUD_DATA_DIR` (o
+  volume `/data` no Docker) com permissão `600`. Eles guardam o que o escritório mostra, não a configuração dos
+  agentes.
 - **O que aparece na tela:** resumos das atividades (ferramenta, arquivo, comando ou consulta), títulos das sessões,
   tarefas e estatísticas (e, no terminal, a conversa). Não exponha a porta em redes em que você não
   confia.
@@ -1028,7 +1203,7 @@ das contas (letra, e-mail, organização) são lidos no host pelo `docker:up` e 
 | `claude --plugin-dir mod/habblaud` | Abre uma sessão com o mod desta pasta, sem instalar (edite e rode `/reload-plugins`). |
 | `npm run mod:status` | Mostra, por conta, o marketplace, os plugins e as versões instaladas. |
 | `npm run demo:timeline` | Gera uma linha do tempo fictícia (simulador do modo demonstração) para o timelapse. |
-| `npm run release` | Publica a versão do `package.json` no GitHub (tag e release com as notas do `CHANGELOG.md`). |
+| `npm run i18n:check` | Confere os quatro dicionários (`shared/locales/`) atrás de chaves faltando ou sobrando. |
 
 Para tirar screenshots sem abrir o seu navegador, `scripts/shot.mjs` usa um Chromium headless isolado (Playwright).
 Na primeira vez, baixe o navegador (uma vez só): `npx playwright-core install chromium-headless-shell`.
@@ -1055,7 +1230,15 @@ HABBLAUD_DATA_DIR=/tmp/habblaud-demo HABBLAUD_TIMELINE=0 HABBLAUD_CLAUDE_DIRS=/t
 `HABBLAUD_TIMELINE=0` evita gravar nessa pasta; com a gravação ligada, dias com mais de 7 dias são apagados.
 
 **Publicar uma versão:** toda versão tem a sua seção no [`CHANGELOG.md`](CHANGELOG.md), com o que entrou. Durante o
-trabalho, anote as mudanças em "Não lançado". Para lançar:
+trabalho, anote as mudanças em "Não lançado".
+
+**Neste fork não existe `npm run release` nem release**: as versões ficam anotadas no [`CHANGELOG.md`](CHANGELOG.md) em
+"Não lançado" e pronto. O spec e o plano de cada entrega vivem em [`docs/superpowers/specs/`](docs/superpowers/specs/)
+e [`docs/superpowers/plans/`](docs/superpowers/plans/) — o vocabulário usado no código e na interface (agente = ficha,
+sessão = execução, personagem = aparência, estado = momento, driver = quem executa) sai do documento de design de lá.
+
+**Publicar uma versão (projeto de origem):** cada versão tem a sua seção no [`CHANGELOG.md`](CHANGELOG.md). Para
+lançar, no repositório original:
 
 1. Suba o número com `npm version minor --no-git-tag-version` (ou `patch`, numa versão só de correções).
 2. Troque "Não lançado" pela versão e a data (`## [0.3.0] - AAAA-MM-DD`), deixe um "Não lançado" vazio em cima e
@@ -1192,8 +1375,12 @@ O Docker Desktop só compartilha algumas pastas do Mac com os containers (por pa
 
 ## Aviso
 
-O Habblaud é um projeto independente, **não afiliado, patrocinado nem endossado pela Anthropic**. "Claude" e
-"Claude Code" são marcas da Anthropic, usadas aqui só para descrever com o que o projeto funciona.
+O Habblaud é um projeto independente de [marmottajr](https://github.com/marmottajr). **Este é um fork divergente**
+(`github.com/guimab/habblaud`) que o transforma na central de trabalho de agentes do
+[Hermes](https://nousresearch.com): projetos, fichas de agente, Inbox com runs em segundo plano, agendas e Consultor.
+Não é **afiliado, patrocinado nem endossado pela Anthropic**: "Claude" e "Claude Code" são marcas da Anthropic, usadas
+aqui só para descrever com o que o projeto funciona. Também não é afiliado à Nous Research: "Hermes" é o nome do
+agente com quem o fork conversa.
 
 Para mostrar os agentes, o Habblaud lê apenas arquivos locais que o próprio Claude Code grava na sua máquina
 (registros das sessões abertas, transcripts e configurações das contas). Esse formato não é documentado e pode mudar entre versões do Claude Code:
