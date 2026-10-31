@@ -167,6 +167,7 @@ export class ConsultPanel {
     try {
       await this.streamAnswer(`/api/runs/${encodeURIComponent(runId)}/events`, { method: 'GET' });
     } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return;
       this.apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
     if (this.view.busy && this.view.runId === runId) this.apply({ type: 'done' });
@@ -269,6 +270,8 @@ export class ConsultPanel {
       }
       await this.streamAnswer(`/api/consult/${encodeURIComponent(this.consultId)}/messages`, text);
     } catch (err) {
+      // Conversa trocada/limpa no meio da resposta: o erro do abort não é desta conversa.
+      if ((err as Error)?.name === 'AbortError') return;
       this.apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
     if (this.view.busy) this.apply({ type: 'done' });
@@ -280,7 +283,8 @@ export class ConsultPanel {
     let res: Response;
     try {
       res = await fetch(url, { ...(typeof body === 'string' ? json({ text: body }) : body), credentials: 'same-origin', cache: 'no-store', signal: this.stream.signal });
-    } catch {
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') throw err;
       throw new Error(tr('o Habblaud não respondeu'));
     }
     if (!res.ok || !res.body) {
@@ -296,6 +300,8 @@ export class ConsultPanel {
       rest = r.rest;
       for (const e of r.events) this.apply(e);
     }
+    // Último evento sem a linha em branco final.
+    if (rest.trim()) for (const e of parseSseChunk(rest, '\n\n').events) this.apply(e);
   }
 
   private apply(e: Parameters<typeof reduceConsult>[1]): void {

@@ -129,7 +129,7 @@ export class HelpDialog {
         'div',
         { class: 'ui-dialog__body' },
         h('section', { class: 'ui-help__intro' }, h('p', { text: INTRO })),
-        h('section', {}, h('h3', { text: 'Status' }), statusList),
+        h('section', {}, h('h3', { text: tr('Status') }), statusList),
         h('section', {}, h('h3', { text: tr('Atividades') }), iconList),
         this.shellSection(),
         this.socialSection(),

@@ -39,6 +39,8 @@ export class InboxPanel {
   private cardProject = new Map<string, string>();
   private timer?: number;
   private loading = false;
+  /** Pedido de releitura que chegou durante outra (ex.: depois de aprovar/dispensar). */
+  private again: boolean | undefined;
 
   constructor(private readonly ctx: UiContext) {
     this.badge = h('span', { class: 'ui-inbox__badge', hidden: true, attrs: { 'aria-hidden': 'true' } });
@@ -95,11 +97,16 @@ export class InboxPanel {
 
   stop(): void {
     if (this.timer) window.clearInterval(this.timer);
+    this.timer = undefined;
   }
 
   /** Lê a Inbox; `cards` também relê ficha → projeto (ao abrir). */
   async refresh(cards = false): Promise<void> {
-    if (this.loading || this.ctx.store.mock) return;
+    if (this.ctx.store.mock) return;
+    if (this.loading) {
+      this.again = this.again || cards;
+      return;
+    }
     this.loading = true;
     try {
       const { items } = await api<{ items: InboxItem[] }>('/api/inbox');
@@ -108,13 +115,15 @@ export class InboxPanel {
       if (cards || this.cardProject.size === 0) await this.loadCards();
       this.render();
     } catch (err) {
-      // 404 = servidor sem driver (Inbox desligada): botão some.
-      if ((err as { status?: number }).status === 404) {
-        this.button.hidden = true;
-        this.stop();
-      }
+      // 404 = servidor sem driver (Inbox desligada): botão some. O poll segue: depois de reiniciar com driver, volta.
+      if ((err as { status?: number }).status === 404) this.button.hidden = true;
     } finally {
       this.loading = false;
+    }
+    if (this.again !== undefined) {
+      const cards = this.again;
+      this.again = undefined;
+      await this.refresh(cards);
     }
   }
 
