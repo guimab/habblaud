@@ -116,6 +116,8 @@ const AGENT_ACTION_ROUTE = /^\/api\/agents\/[^/]+\/(stop|takeover)$/;
 
 /** PUT|DELETE /api/agents/:id/character: personagem do projeto (ver Office.setCharacter). */
 const CHARACTER_ROUTE = /^\/api\/agents\/([^/]+)\/character$/;
+/** POST /api/agents/:id/seen: alguém viu a conclusão do agente (tira o selo "concluiu"; ver Office.markFinishedSeen). */
+const SEEN_ROUTE = /^\/api\/agents\/([^/]+)\/seen$/;
 const NOT_EDITABLE = tr('agente não encontrado: só o agente principal de uma sessão aberta tem personagem editável');
 
 /** Conexão vinda do próprio computador (127.x, ::1 ou ::ffff:127.x). */
@@ -679,6 +681,17 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         sendJson(res, 403, { error: denied(req, tr('mensagens só são mandadas pelo próprio computador (http://localhost ou http://127.0.0.1)')) });
       } else {
         deps.messages(req, res, path);
+      }
+      return true;
+    }
+    const seenMatch = SEEN_ROUTE.exec(path);
+    if (seenMatch) {
+      // Marca de "já vi a conclusão" deste agente: some com o selo "concluiu" e fica gravada no servidor.
+      if (method !== 'POST') methodNotAllowed(res, 'POST');
+      else if (!trusted(req, 'agents')) sendJson(res, 403, { error: denied(req, tr('avisar que viu só pelo próprio computador (http://localhost)')) });
+      else {
+        office.markFinishedSeen(decodeURIComponent(seenMatch[1]!));
+        sendJson(res, 200, { ok: true });
       }
       return true;
     }

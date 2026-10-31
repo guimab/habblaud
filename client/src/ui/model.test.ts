@@ -73,8 +73,22 @@ const snap = { rooms, agents, accounts };
 
 describe('computeCounters', () => {
   it('conta salas, agentes presentes, trabalhando, subagentes ativos e esperando', () => {
-    expect(computeCounters(snap)).toEqual({ rooms: 3, agents: 6, working: 3, subagents: 2, waiting: 2, shells: 0 });
-    expect(computeCounters(null)).toEqual({ rooms: 0, agents: 0, working: 0, subagents: 0, waiting: 0, shells: 0 });
+    expect(computeCounters(snap)).toEqual({ rooms: 3, agents: 6, working: 3, subagents: 2, waiting: 2, shells: 0, finished: 0 });
+    expect(computeCounters(null)).toEqual({ rooms: 0, agents: 0, working: 0, subagents: 0, waiting: 0, shells: 0, finished: 0 });
+  });
+  it('conta só as conclusões que ninguém viu (quem está saindo não conta)', () => {
+    const comSelos = {
+      rooms,
+      accounts,
+      agents: [
+        ...agents,
+        agent({ id: 'novo', name: 'Novo', roomId: 'api', status: 'idle', finishedAt: 100 }),
+        agent({ id: 'visto', name: 'Visto', roomId: 'api', status: 'idle', finishedAt: 100, finishedSeen: true }),
+        agent({ id: 'falhou', name: 'Falhou', roomId: 'api', status: 'idle', finishedAt: 200, finishedFailed: true }),
+        agent({ id: 'saindo2', name: 'Saindo', roomId: 'api', status: 'offline', finishedAt: 300 }),
+      ],
+    };
+    expect(computeCounters(comSelos).finished).toBe(2);
   });
   it('waitingAgents ordena por quem espera há mais tempo', () => {
     expect(waitingAgents(agents).map((a) => a.id)).toEqual(['ana', 'marina']);
@@ -288,7 +302,7 @@ describe('contagem e ordem com shells', () => {
     agent({ id: 'gabi', roomId: 'mega', status: 'waiting', startedAt: 5 }),
   ];
   it('computeCounters conta os shells esperados e tira do "trabalhando" quem está parado num comando longo', () => {
-    expect(computeCounters({ rooms: shellRoom, agents: list }, NOW)).toEqual({ rooms: 1, agents: 5, working: 1, subagents: 0, waiting: 1, shells: 4 });
+    expect(computeCounters({ rooms: shellRoom, agents: list }, NOW)).toEqual({ rooms: 1, agents: 5, working: 1, subagents: 0, waiting: 1, shells: 4, finished: 0 });
   });
   it('shellWaitingAgents: de quem espera há mais tempo para o mais recente', () => {
     expect(shellWaitingAgents(list, NOW).map((a) => a.id)).toEqual(['beatriz', 'caio', 'eva']);

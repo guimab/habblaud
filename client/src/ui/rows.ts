@@ -28,10 +28,17 @@ interface RowRefs {
   task: HTMLElement;
   /** Há quanto tempo está ocioso (no lugar do "Principal"). */
   since: HTMLElement;
+  /** Selo "concluiu" (ou "falhou"): aparece até alguém ver o agente. */
+  done: HTMLElement;
   size: AvatarSize;
 }
 
 const refs = new WeakMap<HTMLElement, RowRefs>();
+
+/** Dica do selo de conclusão ("Concluiu há 3 min" / "O turno terminou com erro há 3 min"). */
+export function finishedTitle(failed: boolean, since: number): string {
+  return failed ? tr('O turno terminou com erro há {0}', [formatDuration(since)]) : tr('Concluiu há {0}', [formatDuration(since)]);
+}
 
 export function createAgentRow(agent: AgentInfo, onPick: (id: string) => void, size: AvatarSize = 'md'): HTMLButtonElement {
   const avatar = createAvatar(agent, size);
@@ -42,16 +49,17 @@ export function createAgentRow(agent: AgentInfo, onPick: (id: string) => void, s
   const activity = createActivityLine();
   const task = h('span', { class: 'ui-agent__task', hidden: true });
   const since = h('span', { class: 'ui-agent__since', hidden: true });
+  const done = h('span', { class: 'ui-agent__done', hidden: true, attrs: { 'aria-hidden': 'true' } });
   const row = h(
     'button',
     { class: 'ui-agent', type: 'button' },
     avatar,
-    h('span', { class: 'ui-agent__main' }, h('span', { class: 'ui-agent__top' }, name, chip, since, role), task, activity),
+    h('span', { class: 'ui-agent__main' }, h('span', { class: 'ui-agent__top' }, name, chip, since, role, done), task, activity),
     dot,
   );
   row.dataset.id = agent.id;
   row.addEventListener('click', () => onPick(row.dataset.id!));
-  refs.set(row, { avatar, name, chip, role, dot, activity, task, since, size });
+  refs.set(row, { avatar, name, chip, role, dot, activity, task, since, done, size });
   return row;
 }
 
@@ -86,6 +94,15 @@ export function updateAgentRow(
   setTitle(r.since, showIdle ? tr('Ocioso há {0}', [formatDuration(idleFor)]) : '');
   setHidden(r.since, !showIdle);
   setHidden(r.role, showIdle);
+  // Selo "concluiu" (ou "falhou"): o turno terminou e ninguém viu ainda. Sai quando a gaveta abre ou a linha é
+  // clicada, e a marca fica no servidor (POST /api/agents/:id/seen; ver server/model/finished.ts).
+  const finished = agent.finishedAt && !agent.finishedSeen ? agent.finishedAt : 0;
+  const failed = finished > 0 && agent.finishedFailed === true;
+  setText(r.done, finished > 0 ? (failed ? tr('falhou') : tr('concluiu')) : '');
+  setHidden(r.done, finished === 0);
+  setTitle(r.done, finished > 0 ? finishedTitle(failed, now - finished) : '');
+  row.classList.toggle('is-finished', finished > 0);
+  row.classList.toggle('is-failed', failed);
   // Esperando um shell (ou parado num comando longo): ampulheta no ponto e o cronômetro na linha de atividade.
   const wait = shellWaitIn(agent, agents, now);
   const status = wait ? 'shell' : agent.status;
@@ -100,6 +117,6 @@ export function updateAgentRow(
   setAttr(
     row,
     'aria-label',
-    `${agent.name}, ${agent.kind === 'main' ? tr('agente principal') : tr('subagente {0}', [agent.role])}, ${account?.name ?? agent.account}${agent.provider === 'codex' ? ' (Codex)' : ''}, ${statusLabel(status)}${doing ? `: ${doing}` : ''}`,
+    `${agent.name}, ${agent.kind === 'main' ? tr('agente principal') : tr('subagente {0}', [agent.role])}, ${account?.name ?? agent.account}${agent.provider === 'codex' ? ' (Codex)' : ''}, ${statusLabel(status)}${doing ? `: ${doing}` : ''}${finished > 0 ? `, ${finishedTitle(failed, now - finished)}` : ''}`,
   );
 }

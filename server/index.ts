@@ -27,6 +27,7 @@ import { DayStatsService } from './history/daystats';
 import { describeStateMigration, legacyEnvWarning, migrateLegacyStateDir } from './legacy';
 import { errMsg, log } from './log';
 import { NameStore } from './model/names';
+import { FinishedStore } from './model/finished';
 import { Office } from './model/office';
 import { createProjectRoutes } from './projects/http';
 import { ProjectStore } from './projects/store';
@@ -94,6 +95,8 @@ const projects = new ProjectStore(join(config.dataDir, 'projects.json'));
 projects.load();
 const agentCards = new AgentStore(join(config.dataDir, 'agents.json'), (id) => !!projects.get(id));
 agentCards.load();
+// Conclusões já vistas: tira o selo "concluiu" da lista (model/finished.ts).
+const finished = new FinishedStore(join(config.dataDir, 'finished.json'));
 
 // Office, contas e fontes de agentes se referenciam (avisos de mudança / fontes): ligação tardia.
 const late: { office?: Office; agents?: SourceSet; permissions?: PermissionRegistry; messages?: MessageRegistry; ptys?: PtyManager; ptyOff?: string } = {};
@@ -150,6 +153,7 @@ const office = new Office({
   ptys: () => (late.ptys ? { status: late.ptys.status(), list: late.ptys.list() } : { status: { enabled: false, reason: late.ptyOff ?? tr('desligado') }, list: [] }),
   updates: () => updates.status(),
   world: () => world?.meta() ?? { enabled: false, configured: false, state: 'off' },
+  finished,
 });
 projects.onChange(() => {
   // Projeto desfeito: as fichas dele ficam sem projeto (isso já dispara relocate pelo onChange das fichas).

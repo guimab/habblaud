@@ -72,6 +72,16 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
 
   const live = h('div', { class: 'ui-sr', role: 'status', attrs: { 'aria-live': 'polite' } });
 
+  /**
+   * Viu o agente (clique na linha, gaveta aberta): tira o selo "concluiu" da lista. A marca fica no servidor
+   * (POST /api/agents/:id/seen), então o selo não volta ao recarregar a página nem ao reiniciar o Habblaud.
+   */
+  const markSeen = (id: string): void => {
+    const a = store.agent(id);
+    if (!a?.finishedAt || a.finishedSeen) return;
+    void store.markAgentSeen(id);
+  };
+
   let topbar: TopBar;
   let sidebar: Sidebar;
   let drawer: Drawer;
@@ -107,6 +117,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
       // Na cidade o escritório (gaveta, terminal) fica escondido: escolher um agente ou sala volta para ele. Antes de
       // tudo: a área livre só mede a gaveta e a barra lateral sem a classe `is-city`.
       scene?.leaveFor(sel);
+      if (sel?.type === 'agent') markSeen(sel.id);
       if (sel && opts?.focus) area.setIntent(sel);
       else area.clearIntent();
       // A gaveta passa a contar na área livre ANTES do foco: o mundo centraliza já na parte visível.

@@ -29,6 +29,7 @@ import { DemoSimulator } from '../../shared/demo/simulator';
 import { describeGitHubEvent, githubEventKey, RoomEffects, type GitHubEvent } from '../../shared/github';
 import { hash32 } from '../../shared/hash';
 import { applyPermission } from '../permissions/registry';
+import type { FinishedMarks } from './finished';
 import type { NameStore, StoredCharacter } from './names';
 import { normalizeCwd, roomDisplayNames, SlotAllocator } from './rooms';
 import type { Project } from '../projects/store';
@@ -92,6 +93,8 @@ export interface OfficeDeps {
   ptys?: () => { status: PtyStatus; list: PtyInfo[] };
   /** Habblaud World (WorldService.meta; ver OfficeSnapshot.meta.world). */
   world?: () => WorldMeta;
+  /** Conclusões já vistas (model/finished.ts): tira o selo "concluiu" do agente que alguém já viu. */
+  finished?: FinishedMarks;
   now?: () => number;
 }
 
@@ -401,6 +404,9 @@ export class Office {
     info.tasks = [];
     info.stats = zeroStats();
     delete info.title;
+    // Sessão nova: a conclusão anterior não vale mais como selo.
+    delete info.finishedAt;
+    delete info.finishedFailed;
     this.addActivity(id, { id: `${id}#clear:${++this.seq}`, at: this.now(), ...SPECIAL.cleared() }, true);
     this.markDirty();
   }
@@ -422,6 +428,8 @@ export class Office {
     const room = this.roomName(info.roomId);
 
     if (status === 'working' && (prev === 'idle' || prev === 'shell' || rec.turnStart === undefined)) rec.turnStart = now;
+    // Fim de turno (ou sessão fechada): guarda a hora para o selo "concluiu" da lista (some quando alguém vê).
+    if (prev === 'working' && (status === 'idle' || status === 'offline') && !this.booting) this.markFinished(info, now);
     if (status === 'shell' && prev !== 'shell') {
       // Terminou o turno com shell(s) rodando: o balão (fillShellActivity) e o aviso falam da espera, não de "concluiu".
       const { label } = this.shellSummary(rec);
@@ -460,6 +468,30 @@ export class Office {
       this.notice('done', id, 'success', tr('✅ {0} concluiu em {1}', [info.name, room]), info.roomId);
     }
     this.markDirty();
+  }
+
+  /**
+   * Alguém viu este agente (abriu a gaveta, clicou na lista): tira o selo "concluiu". A marca fica gravada
+   * (model/finished.ts), então o selo não volta a aparecer ao recarregar a página nem ao reiniciar o servidor.
+   */
+  markFinishedSeen(id: string): void {
+    const at = this.agents.get(id)?.info.finishedAt;
+    if (!at) return;
+    this.deps.finished?.markSeen(id, at);
+    this.markDirty();
+  }
+
+  /** Guarda que o turno terminou agora (ver AgentInfo.finishedAt). */
+  private markFinished(info: AgentInfo, at: number): void {
+    info.finishedAt = at;
+    if (info.activity?.error) info.finishedFailed = true;
+    else delete info.finishedFailed;
+  }
+
+  /** O agente já teve esta conclusão vista: vai sem selo no snapshot (ver model/finished.ts). */
+  private withFinishedSeen(a: AgentInfo): AgentInfo {
+    if (!a.finishedAt || !this.deps.finished?.hasSeen(a.id, a.finishedAt)) return a;
+    return { ...a, finishedSeen: true };
   }
 
   /**
@@ -585,6 +617,8 @@ export class Office {
     info.status = 'offline';
     info.statusSince = now;
     delete info.waitingFor;
+    // Fim de sessão também é uma conclusão: o selo avisa que o agente saiu.
+    if (!this.booting) this.markFinished(info, now);
     // Os shells morrem com a sessão.
     delete info.shells;
     delete rec.shellWait;
@@ -650,6 +684,7 @@ export class Office {
     info.status = 'done';
     info.statusSince = now;
     delete info.shells;
+    if (!this.booting) this.markFinished(info, now);
     rec.removeAt = now + DONE_GRACE_MS;
     if (!this.booting && info.activity?.kind !== 'done') {
       const act: Activity = { id: `${id}#done:${++this.seq}`, at: now, ...SPECIAL.turnDone(now - info.startedAt), durationMs: now - info.startedAt };
@@ -1000,7 +1035,7 @@ export class Office {
       if (effect) room.effect = { ...effect };
     }
     const perms = this.deps.permissions?.();
-    const real = [...this.agents.values()].map((r) => applyPermission(cloneAgent(r.info), perms?.get(r.info.id)));
+    const real = [...this.agents.values()].map((r) => this.withFinishedSeen(applyPermission(cloneAgent(r.info), perms?.get(r.info.id))));
     const reach = this.deps.messages?.();
     // Mensagens pelo escritório: principais presentes cuja sessão está com o plugin conectado. No demo quem decide é
     // o simulador; com o recurso desligado, ninguém recebe.

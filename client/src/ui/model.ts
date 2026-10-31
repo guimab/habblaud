@@ -86,11 +86,13 @@ export interface Counters {
   waiting: number;
   /** Shells que algum agente está esperando terminar (segundo plano e comandos longos em primeiro plano). */
   shells: number;
+  /** Sessões que terminaram um turno e ninguém viu ainda (selo "concluiu" na lista). */
+  finished: number;
 }
 
 /** `now` (relógio do servidor) decide quando um comando em primeiro plano já conta como espera. */
 export function computeCounters(snap: Pick<OfficeSnapshot, 'rooms' | 'agents'> | null, now = Date.now()): Counters {
-  const c: Counters = { rooms: 0, agents: 0, working: 0, subagents: 0, waiting: 0, shells: 0 };
+  const c: Counters = { rooms: 0, agents: 0, working: 0, subagents: 0, waiting: 0, shells: 0, finished: 0 };
   if (!snap) return c;
   c.rooms = snap.rooms.length;
   for (const a of snap.agents) {
@@ -101,6 +103,7 @@ export function computeCounters(snap: Pick<OfficeSnapshot, 'rooms' | 'agents'> |
     else if (a.status === 'working') c.working++;
     if (a.status === 'waiting') c.waiting++;
     if (a.kind === 'sub' && a.status !== 'done') c.subagents++;
+    if (a.finishedAt && !a.finishedSeen) c.finished++;
   }
   return c;
 }

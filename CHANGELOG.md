@@ -10,6 +10,14 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Adicionado
+
+- **Selo "concluiu" na lista de agentes: dá para saber quem terminou sem ter ficado olhando a tela.** Quando o turno
+  de um agente termina (ou a sessão é fechada), a linha dele passa a mostrar um selo — "concluiu" ou "falhou" quando o
+  turno terminou com erro — e o nome fica na cor do selo; a barra do topo ganha o contador **concluíram**. O selo sai
+  quando você abre o agente, e a marca de "já vi" fica gravada no servidor (`<dataDir>/finished.json`): recarregar a
+  página ou reiniciar o Habblaud não traz o selo de volta.
+
 ## [1.0.3] - 2026-10-16
 
 ### Corrigido

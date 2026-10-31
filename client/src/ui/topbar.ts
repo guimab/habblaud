@@ -28,6 +28,8 @@ const COUNTERS: { key: Exclude<keyof Counters, 'shells'>; singular: string; plur
   { key: 'agents', singular: tr('sessão'), plural: tr('sessões'), hint: tr('Sessões abertas no escritório (principais e subagentes)') },
   { key: 'working', singular: tr('trabalhando'), plural: tr('trabalhando'), hint: tr('Sessões processando um pedido agora') },
   { key: 'subagents', singular: tr('subagente'), plural: tr('subagentes'), hint: tr('Subagentes em atividade') },
+  // Conclusões que ninguém viu: o selo "concluiu" da lista some quando o agente é aberto.
+  { key: 'finished', singular: tr('concluiu'), plural: tr('concluíram'), hint: tr('Sessões que terminaram um turno e você ainda não viu') },
   { key: 'waiting', singular: tr('precisa de você'), plural: tr('precisam de você'), hint: tr('Sessões esperando sua resposta no terminal') },
 ];
 const WAITING_HINT = COUNTERS.find((c) => c.key === 'waiting')!.hint;

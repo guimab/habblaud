@@ -175,6 +175,16 @@ export class OfficeStore {
     return detail.history;
   }
 
+  /** Avisa o servidor que a conclusão deste agente já foi vista (tira o selo "concluiu" da lista). */
+  async markAgentSeen(id: string): Promise<void> {
+    if (this.mock || this.replay) return;
+    try {
+      await fetch(`/api/agents/${encodeURIComponent(id)}/seen`, { method: 'POST' });
+    } catch {
+      /* sem rede: o selo continua até o servidor responder */
+    }
+  }
+
   /** Liga/desliga os agentes de demonstração no servidor. */
   async setDemo(enabled: boolean): Promise<boolean> {
     if (this.mock) return true;

@@ -189,6 +189,16 @@ export interface AgentInfo {
    */
   permission?: PermissionRequestInfo;
   /**
+   * Quando o turno terminou pela última vez (epoch ms). Fica no agente e alimenta o selo "concluiu" da lista:
+   * diferente de 'ocioso' (sessão aberta, nada rodando), ele diz que algo acabou de terminar. Ver
+   * server/model/finished.ts — o selo some quando alguém vê o agente (o visto é persistido).
+   */
+  finishedAt?: number;
+  /** A última conclusão terminou com erro (o selo fala de falha, não de sucesso). */
+  finishedFailed?: true;
+  /** A conclusão de `finishedAt` já foi vista: o selo não aparece. */
+  finishedSeen?: true;
+  /**
    * Dá para mandar mensagem a este agente pelo Habblaud (só principais): a sessão tem o plugin habblaud-mensagens
    * e perguntou pela caixa de entrada há pouco. Ver POST /api/messages.
    */

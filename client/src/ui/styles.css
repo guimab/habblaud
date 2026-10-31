@@ -7505,6 +7505,40 @@ html.is-replay #world {
   white-space: nowrap;
 }
 
+/* Selo de conclusão (ui/rows.ts): o turno terminou e ninguém viu ainda. Sai quando o agente é aberto. */
+.ui-agent__done {
+  flex: none;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 15px;
+  color: var(--st-done);
+  background: color-mix(in srgb, var(--st-done) 20%, transparent);
+  white-space: nowrap;
+}
+
+/* O ocioso fica com o tempo à direita: os dois selos não disputam o mesmo canto. */
+.ui-agent__done,
+.ui-agent__since ~ .ui-agent__done {
+  margin-left: 0;
+}
+
+.ui-agent.is-failed .ui-agent__done {
+  color: var(--st-waiting);
+  background: color-mix(in srgb, var(--st-waiting) 22%, transparent);
+}
+
+/* Quem terminou e ninguém viu: o nome fica na cor do selo até a conclusão ser vista. */
+.ui-agent.is-finished .ui-agent__name {
+  color: var(--st-done);
+}
+
+.ui-agent.is-failed .ui-agent__name {
+  color: var(--st-waiting);
+}
+
 /* ------------------------------------------------------------------ janelas móveis (ui/movable.ts) */
 
 .ui-move-handle {

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModSummary, OfficeSnapshot, PermissionRequestInfo, UpdateStatus } from '../../shared/types';
 import { AccountsService } from '../accounts/service';
 import { setQuiet } from '../log';
+import { FinishedStore } from '../model/finished';
 import { NameStore } from '../model/names';
 import { Office, type OfficeDeps } from '../model/office';
 import { tempDir } from '../test/fixtures';
@@ -42,6 +43,7 @@ async function start(extra: Partial<ApiDeps> = {}, officeExtra: Partial<OfficeDe
     accounts: (s) => accounts.list(s),
     sources: () => [],
     accountName: () => undefined,
+    finished: new FinishedStore(null),
     ...officeExtra,
   });
   late.office = office;
@@ -191,6 +193,24 @@ describe('API HTTP', () => {
     expect((await fetch(`${env.base}/api/demo`, { method: 'POST', headers: JSON_HEADERS, body: '{"enabled":1}' })).status).toBe(400);
     expect((await fetch(`${env.base}/api/demo`, { method: 'POST', headers: JSON_HEADERS, body: '{' })).status).toBe(400);
     expect((await fetch(`${env.base}/api/demo`)).status).toBe(405);
+  });
+
+  it('POST /api/agents/:id/seen tira o selo de conclusão (e só aceita POST)', async () => {
+    const alvo = '.claude:1';
+    env.office.setStatus(alvo, 'idle');
+    const comSelo = (await snapshotOf(env.base)).agents.find((a) => a.id === alvo)!;
+    expect(comSelo.finishedAt).toBeGreaterThan(0);
+    expect(comSelo.finishedSeen).toBeUndefined();
+    const res = await fetch(`${env.base}/api/agents/${encodeURIComponent(alvo)}/seen`, { method: 'POST', headers: JSON_HEADERS });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const semSelo = (await snapshotOf(env.base)).agents.find((a) => a.id === alvo)!;
+    expect(semSelo.finishedSeen).toBe(true);
+    // GET na mesma rota não existe (405 com Allow), e um id desconhecido só não faz nada.
+    const get = await fetch(`${env.base}/api/agents/${encodeURIComponent(alvo)}/seen`);
+    expect(get.status).toBe(405);
+    expect(get.headers.get('allow')).toBe('POST');
+    expect((await fetch(`${env.base}/api/agents/nao-existe/seen`, { method: 'POST', headers: JSON_HEADERS })).status).toBe(200);
   });
 
   it('DNS rebinding: Host de outro domínio é recusado em qualquer rota', async () => {
