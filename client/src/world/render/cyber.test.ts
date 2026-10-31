@@ -1,6 +1,6 @@
 // Peças puras do tema cyberpunk: o que se move (chuva, letreiro, painel do elevador) e a piscada do neon.
 import { describe, expect, it } from 'vitest';
-import { CYBER, billboardBars, holoScanlines, neonFlicker, rainDrops } from './cyber';
+import { CYBER, RAIN_PX_PER_SEC, billboardBars, holoScanlines, neonFlicker, rainDrops, type Drop } from './cyber';
 
 const GLASS = { x: 100, y: 50, w: 60, h: 24 };
 
@@ -30,8 +30,26 @@ describe('tema cyberpunk: o que se move', () => {
       expect(d.len).toBeGreaterThanOrEqual(3);
       expect(d.len).toBeLessThanOrEqual(6);
     }
-    expect(rainDrops(GLASS, 900, 3).map((d) => d.y)).not.toEqual(a.map((d) => d.y));
+    expect(rainDrops(GLASS, 5000, 3).map((d) => d.y)).not.toEqual(a.map((d) => d.y));
     expect(rainDrops(GLASS, 0, 3)).toEqual(a); // mesma semente e instante = mesmo quadro
+  });
+
+  it('a chuva cai devagar: ~1 px por segundo no máximo, mais de 10 s para atravessar o vidro', () => {
+    const a = rainDrops(GLASS, 0, 5);
+    const b = rainDrops(GLASS, 1000, 5);
+    const c = rainDrops(GLASS, 4000, 5);
+    // Deslocamento para baixo entre dois quadros, já contando a volta ao topo: o movimento é sempre para baixo,
+    // então o resto do módulo é o quanto a gota andou (e não o salto de volta ao topo).
+    const desceu = (de: Drop, para: Drop) => {
+      const faixa = GLASS.h - de.len + 1;
+      return (para.y - de.y + faixa) % faixa;
+    };
+    a.forEach((d, i) => {
+      expect(desceu(d, b[i]!), `gota ${i} em 1 s`).toBeLessThanOrEqual(Math.ceil(RAIN_PX_PER_SEC.max));
+      expect(desceu(d, c[i]!), `gota ${i} em 4 s`).toBeGreaterThanOrEqual(1); // escorre, não congela
+    });
+    expect(RAIN_PX_PER_SEC.max).toBeLessThanOrEqual(2);
+    expect(GLASS.h / RAIN_PX_PER_SEC.max).toBeGreaterThan(10); // o vidro inteiro leva mais de 10 s
   });
 
   it('o letreiro refletido não sai do vidro e usa as cores do tema', () => {

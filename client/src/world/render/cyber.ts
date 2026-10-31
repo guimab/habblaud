@@ -49,6 +49,13 @@ export function neonFlicker(now: number, seed: number): number {
   return h < 8 ? 0.55 : h < 18 ? 0.82 : 1;
 }
 
+/**
+ * Velocidade da chuva, em pixels por segundo. O vidro da janela tem ~15 px de altura útil, então nesta faixa uma
+ * gota leva de ~10 a ~33 s para atravessá-lo (medido, sementes 1/7/42/99/1234): chuva de Night City escorrendo
+ * devagar. Antes eram 50–110 px/s — o vidro era cruzado em 0,1–0,3 s, rápido demais para o olho ler como chuva.
+ */
+export const RAIN_PX_PER_SEC = { min: 0.4, max: 1.2 } as const;
+
 /** Gotas escorrendo no vidro: cada uma cai na sua velocidade e volta ao topo (o x é fixo por gota). */
 export function rainDrops(glass: Glass, now: number, seed: number, count = 18): Drop[] {
   const w = Math.max(1, Math.floor(glass.w));
@@ -58,7 +65,8 @@ export function rainDrops(glass: Glass, now: number, seed: number, count = 18): 
     const len = 3 + (at(seed, `l${i}`) % 4);
     // O risco fica inteiro dentro do vidro (2 px de largura, `len` de altura): quem desenha nunca depende do clip.
     const x = at(seed, `x${i}`) % Math.max(1, w - 1);
-    const speed = 0.05 + (at(seed, `v${i}`) % 7) / 100;
+    // O `now` chega em ms: px/s ÷ 1000 = px/ms. A posição é inteira, então a gota anda 1 px a cada ~1–2,5 s.
+    const speed = (RAIN_PX_PER_SEC.min + ((RAIN_PX_PER_SEC.max - RAIN_PX_PER_SEC.min) * (at(seed, `v${i}`) % 100)) / 100) / 1000;
     drops.push({ x, y: (Math.floor(now * speed) + at(seed, `y${i}`)) % Math.max(1, h - len + 1), len });
   }
   return drops;

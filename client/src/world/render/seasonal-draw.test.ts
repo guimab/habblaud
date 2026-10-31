@@ -83,7 +83,8 @@ describe('tema cyberpunk: desenho da janela', () => {
     const a = fake();
     const b = fake();
     drawSeasonalWindow(a.ctx, 'cyberpunk', GLASS, 0, 7);
-    drawSeasonalWindow(b.ctx, 'cyberpunk', GLASS, 700, 7);
+    // 5 s de diferença: a gota mais rápida anda poucos pixels (a chuva é lenta de propósito), mas anda.
+    drawSeasonalWindow(b.ctx, 'cyberpunk', GLASS, 5000, 7);
     const ys = (c: FakeCtx) => c.fills.filter((f) => f.style === '#cbe8ff').map((f) => f.y);
     expect(ys(b.c)).not.toEqual(ys(a.c));
   });
