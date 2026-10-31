@@ -28,6 +28,8 @@ export interface ChatEvent {
   preview?: string;
   /** `error`: mensagem já pronta para mostrar (nunca contém credenciais). */
   message?: string;
+  /** `error`: o run foi parado/cancelado (não falhou). */
+  interrupted?: boolean;
   approval?: ApprovalRequest;
   /** `run`: id do run em segundo plano (para redirecionar/parar). */
   runId?: string;
@@ -38,7 +40,7 @@ export type RunEvent = ChatEvent & { seq?: number };
 
 /** Estado de um run. `gone` = o framework não conhece mais o run (expirou ou reiniciou). */
 export interface RunStatus {
-  state: 'running' | 'waiting' | 'done' | 'error' | 'gone';
+  state: 'running' | 'waiting' | 'done' | 'error' | 'interrupted' | 'gone';
   output?: string;
   error?: string;
 }

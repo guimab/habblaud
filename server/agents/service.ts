@@ -16,6 +16,8 @@ export interface CardServiceOptions {
 }
 
 export class CardService {
+  private readonly creating = new Map<string, Promise<void>>();
+
   constructor(private readonly opts: CardServiceOptions) {}
 
   private card(id: string): AgentCard {
@@ -46,7 +48,19 @@ export class CardService {
   private async current(id: string): Promise<{ c: AgentCard; session: string }> {
     let c = this.card(id);
     if (!c.sessions.length) {
-      await this.newSession(id);
+      // Chat e agenda ao mesmo tempo numa ficha sem sessão: uma criação só.
+      let p = this.creating.get(id);
+      if (!p) {
+        p = this.newSession(id).then(
+          () => void this.creating.delete(id),
+          (err: unknown) => {
+            this.creating.delete(id);
+            throw err;
+          },
+        );
+        this.creating.set(id, p);
+      }
+      await p;
       c = this.card(id);
     }
     return { c, session: c.sessions[c.sessions.length - 1]! };

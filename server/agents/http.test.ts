@@ -28,11 +28,11 @@ async function setup(opts: { allowed?: boolean; withDriver?: boolean } = {}) {
   const cards = new AgentStore(null, (id) => id === 'p_aaaaaaaa');
   const consults = new Map([['c1', 'sess-consulta']]);
   const consult = {
-    promote(id: string) {
+    promote(id: string, attach: (sessionId: string) => void) {
       const s = consults.get(id);
       if (!s) throw new ConsultError('consulta desconhecida', 'unknown');
+      attach(s);
       consults.delete(id);
-      return s;
     },
   };
   const route = createCardRoutes({ cards, consult, ...(opts.withDriver === false ? {} : { service: new CardService({ cards, driver }) }) });

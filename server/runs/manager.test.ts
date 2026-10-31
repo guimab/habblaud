@@ -181,6 +181,34 @@ describe('RunManager', () => {
     await m.start(owner, 'y');
   });
 
+  it('dois starts simultâneos na mesma sessão: só um passa', async () => {
+    const f = new FakeRuns();
+    const m = new RunManager({ driver: f.driver(), retryMs: 1 });
+    const r = await Promise.allSettled([m.start(owner, 'a'), m.start(owner, 'b')]);
+    expect(r.map((x) => x.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(f.starts).toHaveLength(1);
+  });
+
+  it('parado no framework vira interrompido (não erro)', async () => {
+    const f = new FakeRuns();
+    const m = new RunManager({ driver: f.driver(), retryMs: 1 });
+    const id = await m.start(owner, 'x');
+    f.push(id, { type: 'error', message: 'interrompido', interrupted: true, seq: 0 }, { type: 'done', seq: 1 });
+    await tick();
+    expect(m.get(id)).toMatchObject({ state: 'interrupted', error: 'interrompido' });
+  });
+
+  it('desistir de reconectar interrompe o run (a sessão não fica ocupada para sempre)', async () => {
+    const f = new FakeRuns();
+    const m = new RunManager({ driver: f.driver(), retryMs: 1, maxRetries: 2 });
+    const id = await m.start(owner, 'x');
+    f.drops = 99;
+    m['reconnect'](id);
+    for (let i = 0; i < 20 && m.active('s1'); i++) await tick();
+    expect(m.get(id)).toMatchObject({ state: 'interrupted' });
+    expect(m.active('s1')).toBeUndefined();
+  });
+
   it('conexão perdida: reconecta do último seq', async () => {
     const f = new FakeRuns();
     const m = new RunManager({ driver: f.driver(), retryMs: 1 });

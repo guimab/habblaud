@@ -24,7 +24,7 @@ export interface CardRouteDeps {
   /** Conversa pelo driver; ausente = sem driver configurado (só fichas). */
   service?: CardService;
   /** Promover consulta. */
-  consult?: { promote(id: string): string };
+  consult?: { promote(id: string, attach: (sessionId: string) => void): void };
 }
 
 function obj(b: unknown): Record<string, unknown> {
@@ -87,7 +87,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
             if (typeof b.fromConsult !== 'string') throw new HttpError(400, 'fromConsult: id da consulta');
             const c = cards.create(input(b)); // valida antes de tirar a consulta do consultor
             try {
-              cards.attachSession(c.id, deps.consult.promote(b.fromConsult));
+              deps.consult.promote(b.fromConsult, (sid) => cards.attachSession(c.id, sid));
             } catch (err) {
               cards.remove(c.id);
               throw err;

@@ -121,7 +121,7 @@ describe('HermesDriver: runs', () => {
     expect(await driver.runStatus('c')).toEqual({ state: 'done', output: 'pronto' });
     expect(await driver.runStatus('d')).toEqual({ state: 'error', error: 'x' });
     expect(await driver.runStatus('e')).toEqual({ state: 'gone' });
-    expect(await driver.runStatus('f')).toEqual({ state: 'error', error: 'interrompido' });
+    expect(await driver.runStatus('f')).toEqual({ state: 'interrupted', error: 'interrompido' });
   });
 
   it('approve, steer e stop chamam /v1/runs/:id/...; 409 vira erro legível', async () => {

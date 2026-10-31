@@ -79,4 +79,38 @@ describe('runs nas conversas', () => {
     now += 100;
     expect(await svc.sweep()).toBe(1);
   });
+
+  it('consulta: se o run não começa, o preâmbulo fica para a próxima', async () => {
+    const { d, runs } = driver();
+    const orig = d.startRun!.bind(d);
+    let fail = true;
+    d.startRun = async (...a) => {
+      if (fail) throw new Error('Hermes fora');
+      return orig(...a);
+    };
+    const mgr = new RunManager({ driver: d, retryMs: 1 });
+    const svc = new ConsultService({ driver: d, runs: mgr });
+    const c = await svc.start({ context: 'ctx' });
+    await expect(all(svc.send(c.id, 'oi', new AbortController().signal))).rejects.toThrow('Hermes fora');
+    fail = false;
+    await all(svc.send(c.id, 'oi de novo', new AbortController().signal));
+    expect(runs[0]!.text).toMatch(/ctx[\s\S]*oi de novo$/);
+  });
+
+  it('ficha sem sessão: duas chamadas ao mesmo tempo criam uma sessão só', async () => {
+    const { d } = driver();
+    let created = 0;
+    const orig = d.createSession.bind(d);
+    d.createSession = async (o) => {
+      created++;
+      await new Promise((r) => setTimeout(r, 5));
+      return orig(o);
+    };
+    const cards = new AgentStore(null, () => true);
+    const c = cards.create({ name: 'Dupla' });
+    const svc = new CardService({ cards, driver: d, runs: new RunManager({ driver: d, retryMs: 1 }) });
+    await Promise.allSettled([svc.background(c.id, 'a'), svc.background(c.id, 'b')]);
+    expect(created).toBe(1);
+    expect(cards.get(c.id)!.sessions).toHaveLength(1);
+  });
 });

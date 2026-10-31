@@ -6,6 +6,9 @@ import { parseSse } from './sse';
 const TITLE_TRIES = 30;
 const CAPABILITIES: ReadonlySet<DriverCapability> = new Set(['chat', 'create', 'approve', 'steer', 'stop']);
 
+/** Limite das chamadas curtas ao Hermes (as de stream usam o sinal de quem assiste). */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export interface HermesDriverOptions {
   baseUrl: string;
   key: string;
@@ -73,9 +76,10 @@ function mapRunEvent(p: Record<string, unknown>): ChatEvent[] {
     case 'run.completed':
       return [{ type: 'done' }];
     case 'run.failed':
+      return [{ type: 'error', message: str(p.error) ?? 'o Hermes não concluiu a resposta' }, { type: 'done' }];
     case 'run.cancelled':
     case 'run.interrupted':
-      return [{ type: 'error', message: str(p.error) ?? (p.event === 'run.failed' ? 'o Hermes não concluiu a resposta' : 'interrompido') }, { type: 'done' }];
+      return [{ type: 'error', message: str(p.error) ?? 'interrompido', interrupted: true }, { type: 'done' }];
     default:
       return [];
   }
@@ -108,10 +112,12 @@ export class HermesDriver implements AgentDriver {
         method,
         headers: { authorization: `Bearer ${this.key}`, 'content-type': 'application/json', ...extra },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal,
+        // Sem sinal (chamada curta): limite de tempo, para um Hermes travado não segurar quem chamou (ex.: agendas).
+        signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
       if (signal?.aborted) throw err;
+      if ((err as Error)?.name === 'TimeoutError') throw new HermesError(tr('o Hermes não respondeu em {0} s', [REQUEST_TIMEOUT_MS / 1000]));
       throw new HermesError(`Hermes fora do ar (${this.base})`);
     }
     if (res.status === 401 || res.status === 403) {
@@ -219,7 +225,7 @@ export class HermesDriver implements AgentDriver {
     const st = String(b.status ?? '');
     if (st === 'completed') return typeof b.output === 'string' ? { state: 'done', output: b.output } : { state: 'done' };
     if (st === 'failed') return { state: 'error', error: this.clean(typeof b.error === 'string' ? b.error : 'falha no Hermes') };
-    if (['cancelled', 'interrupted', 'stopped', 'expired'].includes(st)) return { state: 'error', error: tr('interrompido') };
+    if (['cancelled', 'interrupted', 'stopped', 'expired'].includes(st)) return { state: 'interrupted', error: tr('interrompido') };
     if (st === 'waiting_for_approval') return { state: 'waiting' };
     return { state: 'running' };
   }

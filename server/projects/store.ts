@@ -176,7 +176,13 @@ export class ProjectStore {
 
   private changed(): void {
     this.save();
-    for (const fn of this.listeners) fn();
+    for (const fn of this.listeners) {
+      try {
+        fn();
+      } catch (err) {
+        log.warn(tr('Ouvinte falhou: {0}', [errMsg(err)]));
+      }
+    }
   }
 
   private save(): void {

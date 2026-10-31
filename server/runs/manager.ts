@@ -77,6 +77,8 @@ export class RunManager {
   private readonly now: () => number;
   private saveTimer?: NodeJS.Timeout;
   private closed = false;
+  /** Sessões com start em andamento (evita dois runs na mesma sessão em chamadas simultâneas). */
+  private readonly starting = new Set<string>();
 
   constructor(private readonly opts: RunManagerOptions) {
     this.retryMs = opts.retryMs ?? 1000;
@@ -90,8 +92,14 @@ export class RunManager {
   async start(owner: RunOwner, message: string, chat?: ChatOptions): Promise<string> {
     const d = this.opts.driver;
     if (!d.startRun || !d.runEvents) throw new RunError('unsupported', tr('o driver não suporta runs'));
-    if (this.active(owner.sessionId)) throw new RunError('busy', tr('agente ocupado: espere a resposta, redirecione ou pare'));
-    const runId = await d.startRun(owner.sessionId, message, chat);
+    if (this.active(owner.sessionId) || this.starting.has(owner.sessionId)) throw new RunError('busy', tr('agente ocupado: espere a resposta, redirecione ou pare'));
+    this.starting.add(owner.sessionId);
+    let runId: string;
+    try {
+      runId = await d.startRun(owner.sessionId, message, chat);
+    } finally {
+      this.starting.delete(owner.sessionId);
+    }
     const at = this.now();
     const live: Live = { rec: { runId, owner: { ...owner }, state: 'running', text: '', lastSeq: -1, startedAt: at, updatedAt: at }, buf: [], wake: new Set(), gen: 0 };
     this.runs.set(runId, live);
@@ -232,13 +240,15 @@ export class RunManager {
           if (!l.rec.text && st.output) this.apply(l, { type: 'delta', text: st.output });
           return this.apply(l, { type: 'done' });
         }
+        if (st?.state === 'interrupted') return this.interrupt(l, st.error ?? 'interrompido');
         if (st?.state === 'error') {
           this.apply(l, { type: 'error', message: st.error ?? 'erro' });
           return this.apply(l, { type: 'done' });
         }
         if (++fails > this.maxRetries) {
           log.warn(tr('Run {0}: desisti de reconectar após {1} tentativas', [l.rec.runId, String(this.maxRetries)]));
-          return;
+          // Sem isso o run ficaria "ativo" para sempre (sessão ocupada, quem assiste pendurado).
+          return this.interrupt(l, 'sem contato com o framework');
         }
         await new Promise((r) => setTimeout(r, this.retryMs * Math.min(fails, 30)));
       }
@@ -272,7 +282,7 @@ export class RunManager {
         break;
       case 'error':
         l.rec.error = ev.message ?? 'erro';
-        l.rec.state = 'error';
+        l.rec.state = ev.interrupted ? 'interrupted' : 'error';
         delete l.rec.approval;
         break;
       case 'done':

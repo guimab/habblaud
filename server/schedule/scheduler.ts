@@ -60,6 +60,7 @@ export class Scheduler {
   private timer?: NodeJS.Timeout;
   private ticking = false;
   private recovered = false;
+  private closed = false;
 
   constructor(private readonly opts: SchedulerOptions) {
     this.now = opts.now ?? Date.now;
@@ -150,6 +151,7 @@ export class Scheduler {
   }
 
   close(): void {
+    this.closed = true;
     if (this.timer) clearInterval(this.timer);
     this.save();
   }
@@ -157,6 +159,7 @@ export class Scheduler {
   // ------------------------------------------------------------------ interno
 
   private async fire(s: Schedule): Promise<void> {
+    if (this.closed) return;
     const at = this.now();
     try {
       const runId = await this.opts.start(s.cardId, s.text, s.id);
@@ -219,6 +222,9 @@ export class Scheduler {
           if (typeof s.id !== 'string' || typeof s.cardId !== 'string' || typeof s.text !== 'string') throw new Error('campos');
           s.rule = validateRule(s.rule);
           s.enabled = s.enabled !== false;
+          if (typeof s.createdAt !== 'number') s.createdAt = this.now();
+          // Próxima corrompida (NaN dispararia sempre ou nunca): recalcula.
+          if (s.next !== undefined && !Number.isFinite(s.next)) this.plan(s);
           this.items.push(s);
         } catch (err) {
           log.warn(tr('Ignorei {0} inválido: {1}', ['schedule', errMsg(err)]));

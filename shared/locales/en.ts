@@ -1906,6 +1906,9 @@ export const EN: Readonly<Record<string, string>> = {
   "Uma vez": "Once",
   "uma vez, {0}": "once, {0}",
   "Veio de uma agenda": "Came from a schedule",
+  "Consultor: não consegui arquivar a sessão {0} (tento de novo depois): {1}": "Consultant: couldn't archive session {0} (will retry later): {1}",
+  "o Hermes não respondeu em {0} s": "Hermes didn't respond within {0} s",
+  "Ouvinte falhou: {0}": "Listener failed: {0}",
   "Não consegui gravar {0}: {1}": "Couldn't write {0}: {1}",
 
   // server/permissions/codex.ts

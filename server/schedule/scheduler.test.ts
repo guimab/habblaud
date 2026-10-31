@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -110,5 +110,20 @@ describe('Scheduler', () => {
     expect(start).toHaveBeenCalledWith('c1', 'recente', a.id);
     expect(s2.get(a.id)!.next).toBe(T0 + 8 * H);
     expect(s2.get(b.id)).toMatchObject({ enabled: false, last: { result: 'missed' } });
+  });
+
+  it('fechado não dispara; próxima corrompida no arquivo é recalculada', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'sched-')), 'schedules.json');
+    const t = make({ file });
+    const a = t.s.create({ cardId: 'c1', text: 'x', rule: { kind: 'every', minutes: 30 } });
+    t.s.close();
+    t.set(a.next!);
+    await t.s.tick();
+    expect(t.start).not.toHaveBeenCalled();
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    raw.schedules[0].next = 'lixo';
+    writeFileSync(file, JSON.stringify(raw));
+    const s2 = new Scheduler({ file, now: () => T0, start: vi.fn(async () => 'r'), cardExists: () => true, tickMs: 0 });
+    expect(s2.get(a.id)!.next).toBe(T0 + 30 * 60_000);
   });
 });

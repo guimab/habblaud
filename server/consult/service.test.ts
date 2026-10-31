@@ -91,4 +91,34 @@ describe('ConsultService', () => {
     await expect(drain(svc.send('nada', 'x', sig()))).rejects.toThrow('consulta desconhecida');
     await expect(svc.archive('nada')).rejects.toThrow('consulta desconhecida');
   });
+
+  it('arquivar que falha no driver não marca como arquivada (o sweep tenta de novo)', async () => {
+    const d = new FakeDriver();
+    let fail = true;
+    d.archive = async (id: string) => {
+      if (fail) throw new Error('Hermes fora');
+      d.archived.push(id);
+    };
+    let now = 0;
+    const svc = new ConsultService({ driver: d, now: () => now, idleMs: 1000 });
+    const c = await svc.start({});
+    await expect(svc.archive(c.id)).rejects.toThrow('Hermes fora');
+    expect(svc.list()[0]!.archived).toBe(false);
+    now = 2000;
+    expect(await svc.sweep()).toBe(0);
+    fail = false;
+    expect(await svc.sweep()).toBe(1);
+    expect(svc.list()[0]!.archived).toBe(true);
+  });
+
+  it('promover: se anexar falhar, a consulta continua no consultor', async () => {
+    const svc = new ConsultService({ driver: new FakeDriver() });
+    const c = await svc.start({});
+    expect(() => svc.promote(c.id, () => { throw new Error('conflito'); })).toThrow('conflito');
+    expect(svc.list().map((x) => x.id)).toEqual([c.id]);
+    let got = '';
+    svc.promote(c.id, (sid) => (got = sid));
+    expect(got).toBe(c.sessionId);
+    expect(svc.list()).toEqual([]);
+  });
 });

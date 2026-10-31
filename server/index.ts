@@ -485,6 +485,11 @@ server.on('request', (req, res) => {
     if (guard(req, res)) return;
     if (!api(req, res, url)) fallback(req, res, url);
   } catch (err) {
+    // Endereço com escape inválido (ex.: %E0): é pedido ruim, não erro do servidor.
+    if (err instanceof URIError) {
+      if (!res.headersSent) sendJson(res, 400, { error: tr('endereço inválido') });
+      return;
+    }
     log.warn(tr('Erro ao responder {0} {1}: {2}', [req.method, url.pathname, errMsg(err)]));
     if (!res.headersSent) sendJson(res, 500, { error: tr('erro interno') });
     else res.destroy();
@@ -519,6 +524,10 @@ if (config.remote) {
         if (gate(req, res, url)) return;
         if (!api(req, res, url)) fallback(req, res, url);
       } catch (err) {
+        if (err instanceof URIError) {
+          if (!res.headersSent) sendJson(res, 400, { error: tr('endereço inválido') });
+          return;
+        }
         log.warn(tr('Erro ao responder (remoto) {0} {1}: {2}', [req.method, url.pathname, errMsg(err)]));
         if (!res.headersSent) sendJson(res, 500, { error: tr('erro interno') });
         else res.destroy();

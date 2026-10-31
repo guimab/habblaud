@@ -4,6 +4,7 @@ import { tr } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type { RunManager } from '../runs/manager';
 import type { AgentDriver, ChatEvent } from '../drivers/contract';
+import { errMsg, log } from '../log';
 
 export const CONSULT_IDLE_MS = 30 * 60_000;
 
@@ -85,12 +86,15 @@ export class ConsultService {
     const e = this.get(id);
     if (e.archived) throw new ConsultError(tr('consulta arquivada'), 'archived');
     const message = e.preamble ? `${e.preamble}\n\n${text}` : text;
-    e.preamble = undefined;
     e.lastUsedAt = this.now();
     try {
-      if (!this.runs) yield* this.driver.chat(e.sessionId, message, signal);
-      else {
+      if (!this.runs) {
+        e.preamble = undefined;
+        yield* this.driver.chat(e.sessionId, message, signal);
+      } else {
         const runId = await this.runs.start({ kind: 'consult', id: e.id, sessionId: e.sessionId, title: e.title }, message);
+        // Só some depois que o turno começou: ocupado/Hermes fora não perde o contexto.
+        e.preamble = undefined;
         yield { type: 'run', runId };
         yield* this.runs.subscribe(runId, signal);
       }
@@ -99,12 +103,12 @@ export class ConsultService {
     }
   }
 
-  /** Promover a agente: a consulta sai do consultor (não é mais arquivada sozinha) e devolve a sessão. */
-  promote(id: string): string {
+  /** Promover a agente: entrega a sessão a `attach`; só se der certo a consulta sai do consultor. */
+  promote(id: string, attach: (sessionId: string) => void): void {
     const e = this.get(id);
     if (e.archived) throw new ConsultError(tr('consulta arquivada'), 'archived');
+    attach(e.sessionId);
     this.entries.delete(id);
-    return e.sessionId;
   }
 
   list(): Consult[] {
@@ -114,22 +118,24 @@ export class ConsultService {
   async archive(id: string): Promise<void> {
     const e = this.get(id);
     if (e.archived) return;
-    e.archived = true;
     await this.driver.archive(e.sessionId);
+    e.archived = true;
   }
 
   /** Arquiva as consultas sem uso há mais de `idleMs`; devolve quantas. */
   async sweep(): Promise<number> {
     const limit = this.now() - this.idleMs;
     const idle = [...this.entries.values()].filter((e) => !e.archived && e.lastUsedAt < limit && !this.runs?.active(e.sessionId));
+    let n = 0;
     for (const e of idle) {
-      e.archived = true;
       try {
         await this.driver.archive(e.sessionId);
-      } catch {
-        /* fica marcada localmente; o Hermes só manteria a sessão visível */
+        e.archived = true;
+        n++;
+      } catch (err) {
+        log.warn(tr('Consultor: não consegui arquivar a sessão {0} (tento de novo depois): {1}', [e.sessionId, errMsg(err)]));
       }
     }
-    return idle.length;
+    return n;
   }
 }
