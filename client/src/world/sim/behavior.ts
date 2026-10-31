@@ -117,6 +117,7 @@ export function idleSitMs(rng: () => number, liveliness: WorldOptions['livelines
 export const LONG_IDLE_MS = 10 * 60_000;
 
 export function isLongIdle(status: AgentStatus, statusSince: number, now: number): boolean {
+  if (status === 'sleeping') return true; // ficha sem sessão: cochila desde já
   return status === 'idle' && now - statusSince > LONG_IDLE_MS;
 }
 

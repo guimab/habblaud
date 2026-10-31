@@ -28,7 +28,8 @@ export type Provider = 'claude' | 'codex';
  * - done: subagente concluiu. Entrega o resultado ao agente principal e vai embora.
  * - offline: sessão encerrada. Vai embora (se for o último da sala, apaga a luz).
  */
-export type AgentStatus = 'working' | 'waiting' | 'idle' | 'shell' | 'done' | 'offline';
+/** 'sleeping' = ficha de agente sem sessão aberta (server/agents). */
+export type AgentStatus = 'working' | 'waiting' | 'idle' | 'shell' | 'done' | 'offline' | 'sleeping';
 
 /** Um comando de shell que o agente está esperando terminar. */
 export interface ShellJob {
@@ -140,6 +141,8 @@ export interface AgentInfo {
   parentId?: string;
   /** Pasta em que a sessão roda (a sala pode ser um projeto com várias pastas). */
   cwd?: string;
+  /** Ficha de agente (server/agents) que dá identidade a esta sessão; dorminhoco = id `card:<cardId>`. */
+  cardId?: string;
   roomId: string;
   /** Nome humano único no escritório. Ex.: "Marina". */
   name: string;

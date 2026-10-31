@@ -25,6 +25,7 @@ import { NameStore } from './model/names';
 import { Office } from './model/office';
 import { createProjectRoutes } from './projects/http';
 import { ProjectStore } from './projects/store';
+import { AgentStore } from './agents/store';
 import { RoomAliases } from './model/room-aliases';
 import { createPtyRoutes } from './http/pty';
 import { claudeBinFrom, isExecutableFile, loadPty, PtyManager, type ScreenFactory, type SpawnPty } from './pty/manager';
@@ -84,6 +85,8 @@ const roomAliases = new RoomAliases(join(config.dataDir, 'rooms.json'));
 roomAliases.load();
 const projects = new ProjectStore(join(config.dataDir, 'projects.json'));
 projects.load();
+const agentCards = new AgentStore(join(config.dataDir, 'agents.json'), (id) => !!projects.get(id));
+agentCards.load();
 
 // Office, contas e fontes de agentes se referenciam (avisos de mudança / fontes): ligação tardia.
 const late: { office?: Office; agents?: SourceSet; permissions?: PermissionRegistry; messages?: MessageRegistry; ptys?: PtyManager; ptyOff?: string } = {};
@@ -124,6 +127,7 @@ const office = new Office({
   names,
   roomAlias: (path) => roomAliases.get(path),
   projects,
+  agents: agentCards,
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
   build: config.dev ? undefined : createBuildReader(config.rootDir),
@@ -140,7 +144,13 @@ const office = new Office({
   updates: () => updates.status(),
   world: () => world?.meta() ?? { enabled: false, configured: false, state: 'off' },
 });
-projects.onChange(() => office.relocate());
+projects.onChange(() => {
+  // Projeto desfeito: as fichas dele ficam sem projeto (isso já dispara relocate pelo onChange das fichas).
+  const alive = new Set(projects.list().map((p) => p.id));
+  for (const c of agentCards.list()) if (c.projectId && !alive.has(c.projectId)) agentCards.forgetProject(c.projectId);
+  office.relocate();
+});
+agentCards.onChange(() => office.relocate());
 // Fontes de agentes, uma por ferramenta (sources/source.ts): a do Claude Code e, depois dela, a do Codex (quando há
 // pastas do Codex; HABBLAUD_CODEX=0 desliga), com o histórico dela no HistorySet abaixo e as contas registradas por
 // ela mesma (accounts.setProviderAccounts). `codex` também recebe os eventos dos hooks do Codex (CodexLive).

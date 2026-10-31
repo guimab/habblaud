@@ -23,6 +23,8 @@ export interface RegistryEntry {
   agent?: string;
   updatedAt?: number;
   statusUpdatedAt?: number;
+  /** Sessão no Hermes (adaptador habblaud-hermes): liga a sessão à ficha de agente. */
+  hermesSession?: string;
 }
 
 function str(v: unknown): string | undefined {
@@ -58,6 +60,7 @@ export function parseRegistryEntry(raw: string): RegistryEntry | undefined {
     ['agent', str(j.agent)],
     ['updatedAt', num(j.updatedAt)],
     ['statusUpdatedAt', num(j.statusUpdatedAt)],
+    ['hermesSession', str(j.hermesSession)],
   ];
   for (const [k, v] of optional) if (v !== undefined) (e as unknown as Record<string, unknown>)[k] = v;
   return e;

@@ -32,6 +32,7 @@ import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
 import { normalizeCwd, roomDisplayNames, SlotAllocator } from './rooms';
 import type { Project } from '../projects/store';
+import type { AgentCard } from '../agents/store';
 import { tr } from '../../shared/i18n';
 import type { WorldMeta } from '../../shared/world/api';
 
@@ -44,6 +45,8 @@ export const SHELL_NOTICE_DEDUPE_MS = 600_000;
 /** Evento do GitHub mais velho que isto (linha antiga relida) não anima a sala nem gera aviso. */
 export const GITHUB_LIVE_MS = 120_000;
 const RECENT_LIMIT = 30;
+/** Sala das fichas de agente sem projeto. */
+export const NO_PROJECT_ROOM = 'agents:none';
 /**
  * Atividades de cada agente que vão no snapshot (SSE). O snapshot inteiro sai a cada mudança, e o
  * `recent` completo era ~87% dele; a linha do tempo longa vem de GET /api/agents/:id e o feed já
@@ -59,6 +62,8 @@ export interface OfficeDeps {
   roomAlias?: (path: string) => string | undefined;
   /** Projetos (projects/store.ts): agente em pasta de projeto vai para a sala do projeto. */
   projects?: { match(cwd: string): Project | undefined; get(id: string): Project | undefined };
+  /** Fichas de agente (agents/store.ts): dão nome, aparência e sala às sessões ligadas; sem sessão viva, dormem. */
+  agents?: { list(): AgentCard[]; bySession(sessionId: string): AgentCard | undefined };
   version: string;
   /** Build do cliente servido (ver OfficeSnapshot.meta.build); ausente no modo dev e nos testes. */
   build?: () => string | undefined;
@@ -114,6 +119,8 @@ export interface MainInput {
   startedAt: number;
   status: AgentStatus;
   waitingFor?: string;
+  /** Id da sessão no driver (ex.: Hermes), para ligar à ficha de agente. */
+  driverSession?: string;
 }
 
 export interface SubInput {
@@ -129,6 +136,9 @@ export interface SubInput {
 interface AgentRecord {
   info: AgentInfo;
   history: Activity[];
+  /** Sessão no driver (liga à ficha) e a identidade própria, para voltar a ela quando a ficha solta a sessão. */
+  driverSession?: string;
+  own?: { name: string; look: 'f' | 'm'; role: string };
   removeAt?: number;
   /** Início do turno atual (para "Concluiu em X"). */
   turnStart?: number;
@@ -329,7 +339,8 @@ export class Office {
       this.setStatus(p.id, p.status, p.waitingFor);
       return;
     }
-    const roomId = this.roomFor(p.cwd);
+    const card = p.driverSession ? this.deps.agents?.bySession(p.driverSession) : undefined;
+    const roomId = card ? this.cardRoom(card) : this.roomFor(p.cwd);
     this.ensureRoom(roomId, now);
     const chosen = this.roomCharacter(roomId, p.id, p.sessionId);
     // A mesma sessão retomada noutro processo (ex.: "Assumir aqui") mantém o nome, mesmo com o processo antigo
@@ -361,8 +372,10 @@ export class Office {
     }
     if (p.status === 'waiting') info.waitingFor = p.waitingFor ?? tr('responder no terminal');
     const rec: AgentRecord = { info, history: [] };
+    if (p.driverSession) rec.driverSession = p.driverSession;
     if (p.status === 'working') rec.turnStart = now;
     this.agents.set(p.id, rec);
+    this.applyCard(rec, now);
     const acc = this.deps.accountName(p.account);
     this.notice('arrive', p.id, 'info', tr('👋 {0} chegou em {1}{2}', [info.name, this.roomName(roomId), acc ? ` (${acc})` : '']), roomId);
     this.markDirty();
@@ -960,11 +973,17 @@ export class Office {
     const entries = new Map(this.rooms);
     for (const r of this.demoSnap?.rooms ?? []) entries.set(r.id, { path: r.path, createdAt: r.createdAt });
     this.syncProjectRooms();
+    const sleepers = this.sleepers();
+    for (const s of sleepers) {
+      if (entries.has(s.roomId)) continue;
+      const p = s.roomId.startsWith('project:') ? this.deps.projects?.get(s.roomId.slice('project:'.length)) : undefined;
+      entries.set(s.roomId, p ? { path: p.paths[0] ?? '', createdAt: this.deps.startedAt, project: p.id, paths: [...p.paths] } : { path: '', createdAt: this.deps.startedAt });
+    }
     this.slots.sync(entries.keys(), now);
     const rooms: RoomInfo[] = [...entries]
       .map(([id, r]) => ({
         id,
-        name: this.roomName(id),
+        name: this.roomName(id) === id ? this.sleeperRoomName(id) : this.roomName(id),
         path: r.path,
         ...(r.project ? { project: r.project, paths: [...(r.paths ?? [])] } : {}),
         slot: this.slots.slotOf(id) ?? 0,
@@ -996,7 +1015,7 @@ export class Office {
       rev: this.rev,
       serverTime: now,
       rooms,
-      agents: [...real, ...demoAgents].map(trim),
+      agents: [...real, ...sleepers, ...demoAgents].map(trim),
       accounts: [...this.deps.accounts(sessions), ...(this.demoSnap?.accounts ?? [])],
       ...(ptys ? { ptys: ptys.list } : {}),
       meta: {
@@ -1046,6 +1065,68 @@ export class Office {
     return out;
   }
 
+  /** Sala de uma ficha: a do projeto dela, ou "Sem projeto". */
+  private cardRoom(c: AgentCard): string {
+    return c.projectId && this.deps.projects?.get(c.projectId) ? `project:${c.projectId}` : NO_PROJECT_ROOM;
+  }
+
+  /** Aplica (ou tira) a ficha ligada à sessão do agente: nome, aparência, papel e sala. */
+  private applyCard(rec: AgentRecord, now: number): void {
+    const info = rec.info;
+    if (info.kind !== 'main') return;
+    const card = rec.driverSession ? this.deps.agents?.bySession(rec.driverSession) : undefined;
+    if (card) {
+      rec.own ??= { name: info.name, look: info.look, role: info.role };
+      info.cardId = card.id;
+      info.name = card.name;
+      info.look = card.look ?? rec.own.look;
+      info.role = card.role ?? rec.own.role;
+    } else if (rec.own) {
+      delete info.cardId;
+      info.name = rec.own.name;
+      info.look = rec.own.look;
+      info.role = rec.own.role;
+      delete rec.own;
+    }
+    const roomId = card ? this.cardRoom(card) : info.cwd ? this.roomFor(info.cwd) : info.roomId;
+    if (roomId === info.roomId) return;
+    this.ensureRoom(roomId, now);
+    info.roomId = roomId;
+    for (const sub of this.descendants(info.id)) sub.info.roomId = roomId;
+  }
+
+  /** Fichas sem sessão viva: agentes "dormindo" (não ficam em this.agents; saem no snapshot). */
+  private sleepers(): AgentInfo[] {
+    const cards = this.deps.agents?.list() ?? [];
+    if (!cards.length) return [];
+    const awake = new Set<string>();
+    for (const r of this.agents.values()) if (r.info.cardId && r.info.status !== 'offline') awake.add(r.info.cardId);
+    return cards
+      .filter((c) => !awake.has(c.id))
+      .map((c) => {
+        const a: AgentInfo = {
+          id: `card:${c.id}`,
+          kind: 'main',
+          cardId: c.id,
+          roomId: this.cardRoom(c),
+          name: c.name,
+          look: c.look ?? (hash32(c.id) % 2 ? 'f' : 'm'),
+          role: c.role ?? tr('Agente'),
+          sessionId: c.sessions[c.sessions.length - 1] ?? '',
+          account: c.driver,
+          status: 'sleeping',
+          recent: [],
+          tasks: [],
+          startedAt: this.deps.startedAt,
+          lastEventAt: this.deps.startedAt,
+          statusSince: this.deps.startedAt,
+          stats: zeroStats(),
+          seed: hash32(c.id),
+        };
+        return a;
+      });
+  }
+
   /** Sala de um cwd: a do projeto que contém a pasta, ou a da própria pasta. */
   private roomFor(cwd: string): string {
     const p = this.deps.projects?.match(cwd);
@@ -1055,14 +1136,7 @@ export class Office {
   /** Projetos mudaram (projects.json): cada agente vivo vai para a sala certa, salas vazias somem. */
   relocate(): void {
     const now = this.now();
-    for (const rec of this.agents.values()) {
-      if (rec.info.kind !== 'main' || !rec.info.cwd) continue;
-      const roomId = this.roomFor(rec.info.cwd);
-      if (roomId === rec.info.roomId) continue;
-      this.ensureRoom(roomId, now);
-      rec.info.roomId = roomId;
-      for (const sub of this.descendants(rec.info.id)) sub.info.roomId = roomId;
-    }
+    for (const rec of this.agents.values()) this.applyCard(rec, now);
     this.syncProjectRooms();
     this.dropEmptyRooms();
     this.recomputeRoomNames();
@@ -1098,8 +1172,9 @@ export class Office {
   private recomputeRoomNames(): void {
     const paths = new Map([...this.rooms].map(([id, r]) => [id, r.path]));
     for (const r of this.demoSnap?.rooms ?? []) paths.set(r.id, r.path);
-    for (const id of paths.keys()) if (id.startsWith('project:')) paths.delete(id);
+    for (const id of paths.keys()) if (id.startsWith('project:') || id === NO_PROJECT_ROOM) paths.delete(id);
     this.roomNames = roomDisplayNames(paths);
+    if (this.rooms.has(NO_PROJECT_ROOM)) this.roomNames.set(NO_PROJECT_ROOM, tr('Sem projeto'));
     for (const [id, path] of paths) {
       const alias = this.deps.roomAlias?.(path);
       if (alias) this.roomNames.set(id, alias);
@@ -1109,6 +1184,12 @@ export class Office {
       const p = this.deps.projects?.get(id.slice('project:'.length));
       this.roomNames.set(id, p?.name ?? id);
     }
+  }
+
+  /** Nome de sala que só existe por causa de dorminhocos (não está em this.rooms). */
+  private sleeperRoomName(id: string): string {
+    if (id === NO_PROJECT_ROOM) return tr('Sem projeto');
+    return (id.startsWith('project:') && this.deps.projects?.get(id.slice('project:'.length))?.name) || id;
   }
 
   /** Um nome de sala mudou (renomear): recalcula e transmite. */

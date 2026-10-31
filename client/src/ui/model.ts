@@ -11,10 +11,11 @@ export const STATUS_LABEL: Record<AgentStatus, string> = {
   idle: tr('Ocioso'),
   done: tr('Concluído'),
   offline: tr('Saindo'),
+  sleeping: tr('Dormindo'),
 };
 
 /** Ordem de urgência (menor = mais urgente), usada para destacar quem precisa de atenção. */
-const STATUS_URGENCY: Record<AgentStatus, number> = { waiting: 0, shell: 1, working: 2, idle: 3, done: 4, offline: 5 };
+const STATUS_URGENCY: Record<AgentStatus, number> = { waiting: 0, shell: 1, working: 2, idle: 3, done: 4, offline: 5, sleeping: 6 };
 
 export function statusLabel(status: AgentStatus): string {
   return STATUS_LABEL[status];
@@ -33,6 +34,8 @@ export function activityFallback(agent: Pick<AgentInfo, 'status' | 'waitingFor'>
       return tr('Concluiu a tarefa');
     case 'offline':
       return tr('Saindo do escritório');
+    case 'sleeping':
+      return tr('Dormindo: sem sessão aberta');
     default:
       return tr('Aguardando instruções');
   }
