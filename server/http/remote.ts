@@ -29,9 +29,9 @@ import { parsePasswordHash, verifyPassword, type PasswordHash } from '../remote/
 import { hostAllowed } from './guard';
 import { getLocale, tr } from '../../shared/i18n';
 
-export type RemoteFeature = 'permissions' | 'messages' | 'terminal' | 'spawn' | 'consult';
+export type RemoteFeature = 'permissions' | 'messages' | 'terminal' | 'spawn' | 'consult' | 'projects';
 
-const FEATURES: readonly RemoteFeature[] = ['permissions', 'messages', 'terminal', 'spawn', 'consult'];
+const FEATURES: readonly RemoteFeature[] = ['permissions', 'messages', 'terminal', 'spawn', 'consult', 'projects'];
 
 export interface RemoteTls {
   dir: string;

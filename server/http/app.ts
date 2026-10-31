@@ -23,6 +23,7 @@ import type { DeliveryIndex } from '../deliveries/deliveries';
 import type { FileFetcher } from '../deliveries/fetcher';
 import { HOST_WAIT_MS } from '../host-wait';
 import type { ConsultRoute } from '../consult/http';
+import type { ProjectRoute } from '../projects/http';
 
 export interface ApiDeps {
   office: Office;
@@ -68,6 +69,8 @@ export interface ApiDeps {
   spawn?: SpawnService;
   /** Consultor (sessões rápidas via driver). Ausente = desligado. */
   consult?: ConsultRoute;
+  /** Projetos (projects/http.ts); ausente = rotas 404 (testes). */
+  projects?: ProjectRoute;
   /** Pastas sugeridas no "Novo agente" (GET /api/spawn/folders; spawn/folders.ts): projetos recentes. */
   spawnFolders?: () => Promise<SpawnFolder[]>;
   /** Anexos do "Novo agente" (POST /api/spawn/attachments; spawn/attachments.ts). */
@@ -492,6 +495,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
       } else handleCodexEvent(req, res, { live: deps.codexLive, entries: () => accounts.entriesOf('codex') }).catch((err) => fail(res, err));
       return true;
     }
+    if (deps.projects && (path === '/api/projects' || path.startsWith('/api/projects/'))) return deps.projects(req, res, path, method, trusted(req, 'projects'));
     if (path === '/api/consult' || path.startsWith('/api/consult/')) {
       if (!deps.consult) {
         req.resume();

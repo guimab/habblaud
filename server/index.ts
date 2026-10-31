@@ -23,6 +23,7 @@ import { describeStateMigration, legacyEnvWarning, migrateLegacyStateDir } from 
 import { errMsg, log } from './log';
 import { NameStore } from './model/names';
 import { Office } from './model/office';
+import { createProjectRoutes } from './projects/http';
 import { ProjectStore } from './projects/store';
 import { RoomAliases } from './model/room-aliases';
 import { createPtyRoutes } from './http/pty';
@@ -357,6 +358,7 @@ if (consult) {
 
 const api = createApiHandler({
   consult: consult ? createConsultRoutes(consult) : undefined,
+  projects: createProjectRoutes(projects),
   renameRoom: (id, name) => {
     if (id.startsWith('project:')) {
       try {
