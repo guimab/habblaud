@@ -178,7 +178,7 @@ export class ConsultPanel {
     const id = this.consultId;
     if (!id) return this.reset();
     try {
-      await api(`/api/consult/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await api(`/api/consult/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       this.reset();
     } catch (err) {
       setText(this.status, err instanceof Error ? err.message : String(err));
