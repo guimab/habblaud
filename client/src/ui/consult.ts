@@ -1,11 +1,14 @@
 // Consultor (botão na barra do topo e atalho C): abre uma sessão nova no Hermes (POST /api/consult), com contexto
 // opcional antes da primeira pergunta, e conversa em stream (POST /api/consult/:id/messages, SSE). Não ocupa sala;
 // o servidor arquiva sozinho depois de 30 min sem uso (server/consult/service.ts). Estado puro em consult-model.ts.
+// O mesmo painel conversa com uma ficha de agente (openCard: POST /api/cards/:id/messages) e promove a consulta
+// aberta a agente (POST /api/cards {fromConsult}).
 import { tr } from '../../../shared/i18n';
 import { emptyConsult, parseSseChunk, reduceConsult, sendStarted, type ConsultView } from './consult-model';
 import type { UiContext } from './context';
 import { h, iconButton, setHidden, setText } from './dom';
 import { ICONS } from './icons';
+import { access } from '../net/access';
 import { renderMarkdown } from './markdown';
 
 const TEXT_MAX = 20_000;
@@ -36,6 +39,12 @@ export class ConsultPanel {
   private readonly archiveBtn: HTMLButtonElement;
   private anchor?: HTMLElement;
   private consultId?: string;
+  private card?: { id: string; name: string };
+  private readonly heading: HTMLElement;
+  private readonly promoteBtn: HTMLButtonElement;
+  private readonly promoteBox: HTMLElement;
+  private readonly promoteName: HTMLInputElement;
+  private readonly promoteProject: HTMLSelectElement;
   private view: ConsultView = emptyConsult();
   private stream?: AbortController;
 
@@ -73,12 +82,18 @@ export class ConsultPanel {
     this.sendBtn = h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--allow', type: 'button', on: { click: () => void this.send() } }, tr('Enviar'));
     const newBtn = h('button', { class: 'ui-btn', type: 'button', on: { click: () => this.reset() } }, tr('Nova consulta'));
     this.archiveBtn = h('button', { class: 'ui-btn', type: 'button', on: { click: () => void this.archive() } }, tr('Arquivar'));
+    this.promoteName = h('input', { class: 'ui-rename__input', type: 'text', attrs: { maxlength: 40, placeholder: tr('Nome do agente'), 'aria-label': tr('Nome do agente') } });
+    this.promoteName.addEventListener('keydown', (e) => e.stopPropagation());
+    this.promoteProject = h('select', { class: 'ui-select', attrs: { 'aria-label': tr('Projeto') } });
+    this.promoteBox = h('div', { class: 'ui-project__row', hidden: true }, this.promoteName, this.promoteProject, h('button', { class: 'ui-btn', type: 'button', text: tr('Criar agente'), on: { click: () => void this.promote() } }));
+    this.promoteBtn = h('button', { class: 'ui-btn', type: 'button', title: tr('A consulta vira um agente com ficha (nome, projeto, instruções)'), on: { click: () => this.togglePromote() } }, tr('Promover a agente…'));
+    this.heading = h('h2', { text: tr('Consultor') });
     const close = iconButton(ICONS.close, tr('Fechar'), () => this.hide(), 'ui-icon-btn--sm');
     this.el = h(
       'div',
       { class: 'ui-popover ui-consult', role: 'dialog', tabIndex: -1, attrs: { 'aria-label': tr('Consultor'), id: 'ui-consult', popover: 'manual' } },
-      h('div', { class: 'ui-popover__head' }, h('h2', { text: tr('Consultor') }), close),
-      h('div', { class: 'ui-set-group ui-consult__body' }, this.contextWrap, this.log, this.status, this.input, h('div', { class: 'ui-consult__actions' }, newBtn, this.archiveBtn, this.sendBtn)),
+      h('div', { class: 'ui-popover__head' }, this.heading, close),
+      h('div', { class: 'ui-set-group ui-consult__body' }, this.contextWrap, this.log, this.status, this.input, this.promoteBox, h('div', { class: 'ui-consult__actions' }, newBtn, this.promoteBtn, this.archiveBtn, this.sendBtn)),
     );
     this.render();
   }
@@ -97,7 +112,45 @@ export class ConsultPanel {
     if (typeof this.el.showPopover === 'function') this.el.showPopover();
     else this.el.classList.add('is-open');
     this.anchor?.setAttribute('aria-expanded', 'true');
-    (this.consultId ? this.input : this.context).focus();
+    (this.consultId || this.card ? this.input : this.context).focus();
+  }
+
+  /** Conversa com a ficha (troca de alvo limpa a conversa na tela; `fresh` também). */
+  openCard(card: { id: string; name: string; fresh?: boolean }, anchor?: HTMLElement): void {
+    if (card.fresh || this.card?.id !== card.id) {
+      this.stream?.abort();
+      this.view = emptyConsult();
+    }
+    this.consultId = undefined;
+    this.card = { id: card.id, name: card.name };
+    this.render();
+    if (!this.isOpen) this.toggle(anchor);
+    this.input.focus();
+  }
+
+  private togglePromote(): void {
+    const open = this.promoteBox.hidden;
+    setHidden(this.promoteBox, !open);
+    if (!open) return;
+    const rooms = (this.ctx.store.snapshot?.rooms ?? []).filter((r) => r.id.startsWith('project:'));
+    this.promoteProject.replaceChildren(h('option', { attrs: { value: '' }, text: tr('Sem projeto') }), ...rooms.map((r) => h('option', { attrs: { value: r.id.slice(8) }, text: r.name })));
+    this.promoteName.focus();
+  }
+
+  private async promote(): Promise<void> {
+    const name = this.promoteName.value.trim();
+    if (!name || !this.consultId) return;
+    try {
+      const projectId = this.promoteProject.value;
+      const c = await api<{ id: string; name: string }>('/api/cards', json({ name, fromConsult: this.consultId, ...(projectId ? { projectId } : {}) }));
+      this.consultId = undefined;
+      this.card = { id: c.id, name: c.name };
+      this.promoteName.value = '';
+      setHidden(this.promoteBox, true);
+      this.render();
+    } catch (err) {
+      setText(this.status, err instanceof Error ? err.message : String(err));
+    }
   }
 
   hide(): void {
@@ -126,22 +179,27 @@ export class ConsultPanel {
     this.input.value = '';
     this.render();
     try {
+      if (this.card) {
+        await this.streamAnswer(`/api/cards/${encodeURIComponent(this.card.id)}/messages`, text);
+        if (this.view.busy) this.apply({ type: 'done' });
+        return;
+      }
       if (!this.consultId) {
         const c = await api<{ id: string }>('/api/consult', json({ context: this.context.value.trim() || undefined, screen: this.screen.checked ? this.describeScreen() || undefined : undefined }));
         this.consultId = c.id;
       }
-      await this.streamAnswer(this.consultId, text);
+      await this.streamAnswer(`/api/consult/${encodeURIComponent(this.consultId)}/messages`, text);
     } catch (err) {
       this.apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
     if (this.view.busy) this.apply({ type: 'done' });
   }
 
-  private async streamAnswer(id: string, text: string): Promise<void> {
+  private async streamAnswer(url: string, text: string): Promise<void> {
     this.stream = new AbortController();
     let res: Response;
     try {
-      res = await fetch(`/api/consult/${encodeURIComponent(id)}/messages`, { ...json({ text }), credentials: 'same-origin', cache: 'no-store', signal: this.stream.signal });
+      res = await fetch(url, { ...json({ text }), credentials: 'same-origin', cache: 'no-store', signal: this.stream.signal });
     } catch {
       throw new Error(tr('o Habblaud não respondeu'));
     }
@@ -168,6 +226,8 @@ export class ConsultPanel {
   private reset(): void {
     this.stream?.abort();
     this.consultId = undefined;
+    this.card = undefined;
+    setHidden(this.promoteBox, true);
     this.view = emptyConsult();
     this.context.value = '';
     this.render();
@@ -186,7 +246,10 @@ export class ConsultPanel {
   }
 
   private render(): void {
-    setHidden(this.contextWrap, !!this.consultId || this.view.turns.length > 0);
+    setText(this.heading, this.card ? this.card.name : tr('Consultor'));
+    setHidden(this.contextWrap, !!this.card || !!this.consultId || this.view.turns.length > 0);
+    setHidden(this.promoteBtn, !this.consultId || !!this.card || access().agents !== true);
+    setHidden(this.archiveBtn, !!this.card);
     this.log.replaceChildren(
       ...this.view.turns.map((t) => {
         const el = h('div', { class: `ui-consult__turn ui-consult__turn--${t.role}` });

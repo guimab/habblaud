@@ -42,6 +42,7 @@ import { access } from '../net/access';
 import { PermissionCard } from './permission';
 import { canRenameRoom } from './roomrename';
 import { ProjectSection } from './project';
+import { CardSection, NewCardRow } from './card';
 import { pathsLabel } from './project-model';
 import { accountChipLabel, accountProvider, CODEX_LIVE_HINT, codexApprovalLabel, providerOf } from './provider';
 import { ptyControllable } from './ptyapi';
@@ -217,6 +218,7 @@ class AgentView {
   private statusSince: HTMLElement;
   private followBtn: HTMLButtonElement;
   private termBtn: HTMLButtonElement;
+  private readonly cardSec: CardSection;
   private termLabel: HTMLElement;
   /** Por que o terminal não abre: no celular não há hover para ler o title, então o toque mostra o motivo aqui. */
   private termWhy: HTMLElement;
@@ -309,6 +311,7 @@ class AgentView {
     );
 
     // Terminal: a conversa da sessão como o Claude Code mostra, ao vivo (só com acesso local).
+    this.cardSec = new CardSection(ctx);
     this.termLabel = h('span', { class: 'ui-term-cta__label', text: tr('Abrir terminal') });
     const termIcon = h('span', { class: 'ui-term-cta__icon', attrs: { 'aria-hidden': 'true' } });
     termIcon.innerHTML = ICONS.terminal;
@@ -413,6 +416,7 @@ class AgentView {
       this.title,
       this.gone,
       statusRow,
+      this.cardSec.el,
       this.termBtn,
       this.termWhy,
       this.alert,
@@ -618,7 +622,11 @@ class AgentView {
     setText(this.actDetail, detail);
 
     // Mandar mensagem: só para principais presentes (com o recurso ligado e a página local; sem o plugin, a dica).
-    setHidden(this.msgSec.el, this.composer.render(live, this.id) === 'off');
+    // Ficha dormindo (sem sessão aberta): conversa pelo botão Conversar da ficha, não por terminal/mensagem.
+    const sleeping = a.status === 'sleeping';
+    setHidden(this.msgSec.el, sleeping || this.composer.render(live, this.id) === 'off');
+    setHidden(this.termBtn, sleeping);
+    this.cardSec.render(live);
 
     // Vida social (personalidade, carteira, rodas): só de quem está no escritório.
     if (live) this.social.render(a.id, now);
@@ -816,6 +824,7 @@ class RoomView {
   private feed: KeyedList<FeedItem>;
   private feedSec: ReturnType<typeof section>;
   private project: ProjectSection;
+  private newCard: NewCardRow;
   private newBtn: HTMLButtonElement;
   private newMsg: HTMLElement;
 
@@ -843,6 +852,7 @@ class RoomView {
     centerBtn.append(h('span', { text: tr('Centralizar') }));
     this.gone = h('p', { class: 'ui-gone', text: tr('Esta sala foi fechada: todos os agentes saíram.'), hidden: true });
     this.project = new ProjectSection(ctx);
+    this.newCard = new NewCardRow(ctx);
 
     const accsEl = h('div', { class: 'ui-acc-list' });
     this.accs = new KeyedList<string>(accsEl, {
@@ -888,6 +898,7 @@ class RoomView {
       h('div', { class: 'ui-status' }, accsEl, h('span', { class: 'ui-status__actions' }, this.newBtn, centerBtn)),
       this.newMsg,
       this.project.el,
+      this.newCard.el,
       this.agentsSec.el,
       this.tasksSec.el,
       this.feedSec.el,
@@ -929,6 +940,7 @@ class RoomView {
     setText(this.path, r.project ? pathsLabel({ ...r, paths: (r.paths ?? []).map(shortPath) }) || tr('projeto sem pasta') : shortPath(r.path));
     setTitle(this.path, r.project ? (r.paths ?? []).join('\n') : r.path);
     this.project.render(r, !!live);
+    this.newCard.render(r, !!live);
     try {
       setStyleVar(this.swatch, '--room', roomTheme(r.seed).accent);
     } catch {

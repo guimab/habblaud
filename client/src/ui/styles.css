@@ -11253,3 +11253,8 @@ html.is-replay #world {
   color: inherit;
   opacity: 0.75;
 }
+
+/* Fichas de agente (ui/card.ts). */
+.ui-card { display: flex; flex-direction: column; gap: 6px; }
+.ui-card__field { display: flex; flex-direction: column; gap: 2px; }
+.ui-card__field > .ui-rename__input, .ui-card__field > .ui-select { width: 100%; box-sizing: border-box; }

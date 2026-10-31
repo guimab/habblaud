@@ -121,6 +121,7 @@ export class TopBar implements UiComponent {
     this.spawnBtn.hidden = true;
     this.consultPanel = new ConsultPanel(ctx);
     ctx.root.append(this.consultPanel.el);
+    ctx.chatCard = (card) => this.consultPanel.openCard(card, this.consultBtn);
     this.consultBtn = iconButton(ICONS.consult, tr('Consultor: pergunta rápida numa sessão nova do Hermes (C)'), () => this.consultPanel.toggle(this.consultBtn), 'ui-btn-consult');
     this.consultBtn.setAttribute('aria-haspopup', 'dialog');
     this.consultBtn.hidden = true;

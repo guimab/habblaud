@@ -36,6 +36,8 @@ export interface UiContext {
   readonly store: OfficeStore;
   /** Janela de terminal (definida depois que os painéis existem). */
   terminals?: TerminalRouter;
+  /** Abre a conversa com uma ficha de agente no painel do consultor (definido pela barra do topo). `fresh`: sessão nova. */
+  chatCard?(card: { id: string; name: string; fresh?: boolean }): void;
   readonly world: WorldApi;
   readonly root: HTMLElement;
   readonly prefs: Readonly<UiPrefs>;
