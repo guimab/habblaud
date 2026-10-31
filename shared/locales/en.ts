@@ -1797,6 +1797,9 @@ export const EN: Readonly<Record<string, string>> = {
 
   // server/model/room-aliases.ts
   "rooms.json ilegível ({0}); sem nomes de sala personalizados.": "rooms.json unreadable ({0}); no custom room names.",
+  "Run {0}: desisti de reconectar após {1} tentativas": "Run {0}: gave up reconnecting after {1} attempts",
+  "Ouvinte de runs falhou: {0}": "Runs listener failed: {0}",
+  "Ignorei {0} inválido: {1}": "Ignored invalid {0}: {1}",
   "Não consegui gravar {0}: {1}": "Couldn't write {0}: {1}",
 
   // server/permissions/codex.ts

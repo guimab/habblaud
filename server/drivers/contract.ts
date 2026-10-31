@@ -20,7 +20,7 @@ export interface ApprovalRequest {
 
 export interface ChatEvent {
   /** `approval`: o run espera aprovação; `approved`: alguém respondeu e o run seguiu. */
-  type: 'delta' | 'tool' | 'done' | 'error' | 'approval' | 'approved';
+  type: 'delta' | 'tool' | 'done' | 'error' | 'approval' | 'approved' | 'run';
   /** `delta`: pedaço de texto da resposta. */
   text?: string;
   /** `tool`: nome da ferramenta em uso e uma prévia curta. */
@@ -29,6 +29,8 @@ export interface ChatEvent {
   /** `error`: mensagem já pronta para mostrar (nunca contém credenciais). */
   message?: string;
   approval?: ApprovalRequest;
+  /** `run`: id do run em segundo plano (para redirecionar/parar). */
+  runId?: string;
 }
 
 /** Evento de um run, com a posição no histórico do framework (para retomar depois). */

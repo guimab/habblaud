@@ -6,6 +6,7 @@ import http from 'node:http';
 import { join } from 'node:path';
 import { codexDirsRefused, isDefaultDir } from './accounts/detect';
 import { AccountsService } from './accounts/service';
+import { RunManager } from './runs/manager';
 import { HermesDriver } from './drivers/hermes/client';
 import { createConsultRoutes } from './consult/http';
 import { ConsultService } from './consult/service';
@@ -363,7 +364,10 @@ const ticker = setInterval(() => {
 
 // Consultor: sessões rápidas no Hermes pela API HTTP (desligado sem HABBLAUD_HERMES_*).
 const hermesDriver = config.hermes ? new HermesDriver({ baseUrl: config.hermes.baseUrl, key: config.hermes.key }) : undefined;
-const consult = hermesDriver ? new ConsultService({ driver: hermesDriver }) : undefined;
+// Runs em segundo plano: o turno continua no Hermes com o painel fechado; retomados ao reiniciar.
+const runs = hermesDriver ? new RunManager({ driver: hermesDriver, file: join(config.dataDir, 'runs.json') }) : undefined;
+runs?.resume();
+const consult = hermesDriver ? new ConsultService({ driver: hermesDriver, ...(runs ? { runs } : {}) }) : undefined;
 if (consult) {
   setInterval(() => void consult.sweep().catch(() => {}), 60_000).unref();
   log.info(`   Consultor ligado (Hermes em ${config.hermes!.baseUrl}).`);
@@ -372,7 +376,7 @@ if (consult) {
 const api = createApiHandler({
   consult: consult ? createConsultRoutes(consult) : undefined,
   projects: createProjectRoutes(projects),
-  cards: createCardRoutes({ cards: agentCards, ...(hermesDriver ? { service: new CardService({ cards: agentCards, driver: hermesDriver, projects }) } : {}), ...(consult ? { consult } : {}) }),
+  cards: createCardRoutes({ cards: agentCards, ...(hermesDriver ? { service: new CardService({ cards: agentCards, driver: hermesDriver, projects, ...(runs ? { runs } : {}) }) } : {}), ...(consult ? { consult } : {}) }),
   renameRoom: (id, name) => {
     if (id.startsWith('project:')) {
       try {
@@ -598,6 +602,7 @@ function shutdown(signal: string): void {
   updates.stop();
   worldViewer?.stop();
   worldUplink?.stop();
+  runs?.close();
   world?.stop();
   names.flush();
   void closeVite?.();

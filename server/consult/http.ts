@@ -1,4 +1,5 @@
 // Rotas do Consultor: /api/consult (listar, criar), /api/consult/:id/messages (conversa em SSE), DELETE (arquivar).
+import { RunError } from '../runs/manager';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { HttpError, readJson, sendJson } from '../http/app';
 import { ConsultError, type ConsultService } from './service';
@@ -19,12 +20,13 @@ function sendError(res: ServerResponse, err: unknown): void {
   if (res.headersSent) return void res.destroy();
   if (err instanceof HttpError) return sendJson(res, err.status, { error: err.message });
   if (err instanceof ConsultError) return sendJson(res, err.code === 'unknown' ? 404 : 409, { error: err.message });
+  if (err instanceof RunError) return sendJson(res, err.code === 'unknown' ? 404 : err.code === 'unsupported' ? 501 : 409, { error: err.message });
   sendJson(res, 502, { error: err instanceof Error ? err.message : 'erro no driver' });
 }
 
 async function streamMessage(svc: ConsultService, req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
   const text = await readText(req);
-  await streamChat(res, (signal) => svc.send(id, text, signal), (err) => err instanceof ConsultError);
+  await streamChat(res, (signal) => svc.send(id, text, signal), (err) => err instanceof ConsultError || err instanceof RunError);
 }
 
 /** Lê `{text}` do corpo (até CONSULT_TEXT_MAX, não vazio). */

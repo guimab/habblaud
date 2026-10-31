@@ -3,12 +3,15 @@
 // driver. Sessão nova pedida pelo usuário ("Nova conversa") vira a mais recente.
 import type { AgentDriver, ChatEvent } from '../drivers/contract';
 import type { Project } from '../projects/store';
+import type { RunManager } from '../runs/manager';
 import { AgentError, type AgentCard, type AgentStore } from './store';
 
 export interface CardServiceOptions {
   cards: AgentStore;
   driver: AgentDriver;
   projects?: { get(id: string): Project | undefined };
+  /** Com runs, o turno roda em segundo plano e sobrevive ao painel fechado. */
+  runs?: RunManager;
 }
 
 export class CardService {
@@ -45,6 +48,10 @@ export class CardService {
       c = this.card(id);
     }
     const session = c.sessions[c.sessions.length - 1]!;
-    yield* this.opts.driver.chat(session, text, signal, { system: this.system(c) });
+    const runs = this.opts.runs;
+    if (!runs) return yield* this.opts.driver.chat(session, text, signal, { system: this.system(c) });
+    const runId = await runs.start({ kind: 'card', id: c.id, sessionId: session, title: c.name }, text, { system: this.system(c) });
+    yield { type: 'run', runId };
+    yield* runs.subscribe(runId, signal);
   }
 }

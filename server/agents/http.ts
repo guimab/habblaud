@@ -8,6 +8,7 @@
 //   POST /api/cards/:id/sessions              abrir sessão nova (vira a mais recente)
 //   POST /api/cards/:id/messages {text}       conversar (SSE, mesmo formato do consultor)
 // Ler é livre; o resto exige a trava de acesso (loopback ou HABBLAUD_REMOTE_ALLOW=agents).
+import { RunError } from '../runs/manager';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readText, streamChat } from '../consult/http';
 import { ConsultError } from '../consult/service';
@@ -47,6 +48,7 @@ function sendError(res: ServerResponse, err: unknown): void {
   if (err instanceof HttpError) return sendJson(res, err.status, { error: err.message });
   if (err instanceof AgentError) return sendJson(res, err.code === 'unknown' ? 404 : err.code === 'conflict' ? 409 : 400, { error: err.message });
   if (err instanceof ConsultError) return sendJson(res, err.code === 'unknown' ? 404 : 409, { error: err.message });
+  if (err instanceof RunError) return sendJson(res, err.code === 'unknown' ? 404 : err.code === 'unsupported' ? 501 : 409, { error: err.message });
   sendJson(res, 502, { error: err instanceof Error ? err.message : 'erro no driver' });
 }
 
@@ -144,7 +146,7 @@ export function createCardRoutes(deps: CardRouteDeps): CardRoute {
         run(async () => {
           if (!cards.get(id)) throw new AgentError('unknown', 'agente desconhecido');
           const text = await readText(req);
-          await streamChat(res, (signal) => svc.chat(id, text, signal), (err) => err instanceof AgentError);
+          await streamChat(res, (signal) => svc.chat(id, text, signal), (err) => err instanceof AgentError || err instanceof RunError);
         });
     } else notFound(req, res);
     return true;

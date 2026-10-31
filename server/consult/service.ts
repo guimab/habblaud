@@ -1,6 +1,7 @@
 // Consultas rápidas: uma sessão nova por consulta, contexto opcional só na primeira mensagem, arquivada sozinha
 // depois de um tempo sem uso. Não depende de framework: usa só o contrato do driver.
 import { randomUUID } from 'node:crypto';
+import type { RunManager } from '../runs/manager';
 import type { AgentDriver, ChatEvent } from '../drivers/contract';
 
 export const CONSULT_IDLE_MS = 30 * 60_000;
@@ -23,6 +24,8 @@ export interface ConsultServiceOptions {
   driver: AgentDriver;
   now?: () => number;
   idleMs?: number;
+  /** Com runs, o turno roda em segundo plano e sobrevive ao painel fechado. */
+  runs?: RunManager;
 }
 
 export class ConsultError extends Error {
@@ -45,10 +48,13 @@ export class ConsultService {
   private readonly idleMs: number;
   private readonly entries = new Map<string, Entry>();
 
+  private readonly runs?: RunManager;
+
   constructor(opts: ConsultServiceOptions) {
     this.driver = opts.driver;
     this.now = opts.now ?? Date.now;
     this.idleMs = opts.idleMs ?? CONSULT_IDLE_MS;
+    this.runs = opts.runs;
   }
 
   async start(input: { context?: string; screen?: string }): Promise<Consult> {
@@ -81,7 +87,12 @@ export class ConsultService {
     e.preamble = undefined;
     e.lastUsedAt = this.now();
     try {
-      yield* this.driver.chat(e.sessionId, message, signal);
+      if (!this.runs) yield* this.driver.chat(e.sessionId, message, signal);
+      else {
+        const runId = await this.runs.start({ kind: 'consult', id: e.id, sessionId: e.sessionId, title: e.title }, message);
+        yield { type: 'run', runId };
+        yield* this.runs.subscribe(runId, signal);
+      }
     } finally {
       e.lastUsedAt = this.now();
     }
@@ -109,7 +120,7 @@ export class ConsultService {
   /** Arquiva as consultas sem uso há mais de `idleMs`; devolve quantas. */
   async sweep(): Promise<number> {
     const limit = this.now() - this.idleMs;
-    const idle = [...this.entries.values()].filter((e) => !e.archived && e.lastUsedAt < limit);
+    const idle = [...this.entries.values()].filter((e) => !e.archived && e.lastUsedAt < limit && !this.runs?.active(e.sessionId));
     for (const e of idle) {
       e.archived = true;
       try {
