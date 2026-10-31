@@ -130,11 +130,39 @@ describe('HermesDriver: runs', () => {
     await driver.approve('r1', 'deny');
     await driver.stop('r1');
     await expect(driver.steer('r1', 'mude o foco')).rejects.toThrow(/steer/);
+    // Cada approve confere a projeção do run antes (procurando a geração de execução); sem
+    // `execution_generation` na resposta, o corpo segue o formato antigo (só a escolha).
     expect(seen.map((s) => [s.method, s.url, s.body])).toEqual([
+      ['GET', '/v1/runs/r1', undefined],
       ['POST', '/v1/runs/r1/approval', { choice: 'session', request_id: 'q1' }],
+      ['GET', '/v1/runs/r1', undefined],
       ['POST', '/v1/runs/r1/approval', { choice: 'deny' }],
       ['POST', '/v1/runs/r1/stop', {}],
       ['POST', '/v1/runs/r1/steer', { text: 'mude o foco' }],
     ]);
+  });
+
+  it('approve manda request_id + execution_generation quando o Hermes exige (run com autoridade)', async () => {
+    // Hermes com execução sob autoridade recusa qualquer corpo que não seja exatamente
+    // {request_id, execution_generation, choice} (400 invalid_params) — o evento approval.request
+    // traz o request_id, e a geração vem da projeção do run.
+    const { driver, seen } = await fake((r, res) =>
+      r.url === '/v1/runs/r1'
+        ? json(res, 200, { status: 'waiting_for_approval', execution_generation: 4, pending_controls: [{ kind: 'approval', prompt_id: 'q9' }] })
+        : json(res, 200, {}),
+    );
+    await driver.approve('r1', 'once', 'q1');
+    await driver.approve('r1', 'deny');
+    expect(seen.filter((s) => s.url.endsWith('/approval')).map((s) => s.body)).toEqual([
+      { request_id: 'q1', execution_generation: 4, choice: 'once' },
+      // Sem request_id de quem chamou, vale o pedido pendente da projeção.
+      { request_id: 'q9', execution_generation: 4, choice: 'deny' },
+    ]);
+  });
+
+  it('approve não quebra se a projeção do run falhar: cai no corpo antigo', async () => {
+    const { driver, seen } = await fake((r, res) => (r.url === '/v1/runs/r1' ? json(res, 404, { error: { message: 'Run not found' } }) : json(res, 200, {})));
+    await driver.approve('r1', 'once', 'q1');
+    expect(seen.filter((s) => s.method === 'POST').map((s) => s.body)).toEqual([{ choice: 'once', request_id: 'q1' }]);
   });
 });

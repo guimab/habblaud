@@ -221,13 +221,21 @@ export class HermesDriver implements AgentDriver {
       return { state: 'gone' };
     }
     if (!res.ok) await this.fail(res);
-    const b = (await res.json().catch(() => ({}))) as { status?: unknown; output?: unknown; error?: unknown };
+    const b = (await res.json().catch(() => ({}))) as {
+      status?: unknown; output?: unknown; error?: unknown;
+      execution_generation?: unknown; pending_controls?: unknown;
+    };
+    const controls = Array.isArray(b.pending_controls) ? b.pending_controls : [];
+    const pending = controls.find((c) => !!c && typeof c === 'object' && (c as { kind?: unknown }).kind === 'approval') as { prompt_id?: unknown } | undefined;
+    const extra: Pick<RunStatus, 'executionGeneration' | 'pendingApprovalId'> = {};
+    if (typeof b.execution_generation === 'number') extra.executionGeneration = b.execution_generation;
+    if (typeof pending?.prompt_id === 'string') extra.pendingApprovalId = pending.prompt_id;
     const st = String(b.status ?? '');
-    if (st === 'completed') return typeof b.output === 'string' ? { state: 'done', output: b.output } : { state: 'done' };
-    if (st === 'failed') return { state: 'error', error: this.clean(typeof b.error === 'string' ? b.error : 'falha no Hermes') };
-    if (['cancelled', 'interrupted', 'stopped', 'expired'].includes(st)) return { state: 'interrupted', error: tr('interrompido') };
-    if (st === 'waiting_for_approval') return { state: 'waiting' };
-    return { state: 'running' };
+    if (st === 'completed') return { state: 'done', ...(typeof b.output === 'string' ? { output: b.output } : {}), ...extra };
+    if (st === 'failed') return { state: 'error', error: this.clean(typeof b.error === 'string' ? b.error : 'falha no Hermes'), ...extra };
+    if (['cancelled', 'interrupted', 'stopped', 'expired'].includes(st)) return { state: 'interrupted', error: tr('interrompido'), ...extra };
+    if (st === 'waiting_for_approval') return { state: 'waiting', ...extra };
+    return { state: 'running', ...extra };
   }
 
   private async runAction(runId: string, action: string, body: Record<string, unknown>): Promise<void> {
@@ -240,8 +248,24 @@ export class HermesDriver implements AgentDriver {
     await res.body?.cancel();
   }
 
-  approve(runId: string, choice: ApprovalChoice, requestId?: string): Promise<void> {
-    return this.runAction(runId, 'approval', requestId ? { choice, request_id: requestId } : { choice });
+  /**
+   * Resolve um pedido de aprovação. O Hermes com execução sob autoridade só aceita o corpo
+   * exatamente `{request_id, execution_generation, choice}` e recusa qualquer outro com 400
+   * `invalid_params` — a escolha sozinha não basta (foi o que fazia o escritório mostrar "erro 502").
+   * O `request_id` vem do evento `approval.request` e a `execution_generation` da projeção do run
+   * (GET /v1/runs/:id, que o driver relê na hora). Sem `execution_generation` na projeção — Hermes
+   * anterior — vai o corpo antigo, que não pede a geração.
+   */
+  async approve(runId: string, choice: ApprovalChoice, requestId?: string): Promise<void> {
+    const projection = await this.runStatus(runId).catch(() => undefined);
+    const generation = projection?.executionGeneration;
+    const body: Record<string, unknown> =
+      generation === undefined
+        ? requestId
+          ? { choice, request_id: requestId }
+          : { choice }
+        : { request_id: requestId ?? projection?.pendingApprovalId ?? '', execution_generation: generation, choice };
+    return this.runAction(runId, 'approval', body);
   }
 
   steer(runId: string, text: string): Promise<void> {

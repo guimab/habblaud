@@ -43,6 +43,13 @@ export interface RunStatus {
   state: 'running' | 'waiting' | 'done' | 'error' | 'interrupted' | 'gone';
   output?: string;
   error?: string;
+  /**
+   * Hermes com execução sob autoridade (ver `approve`): geração da execução atual, exigida no
+   * corpo do approve. Ausente nos Hermes anteriores, que não pedem a geração.
+   */
+  executionGeneration?: number;
+  /** Id do pedido de aprovação pendente, como aparece em `pending_controls` da projeção do run. */
+  pendingApprovalId?: string;
 }
 
 /** Sessão criada pelo driver. */
