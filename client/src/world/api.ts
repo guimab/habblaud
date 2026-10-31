@@ -17,12 +17,12 @@ export interface WorldOptions {
   dayNight: boolean;
   /** (Opcional, aditivo) Ciclo dia/noite: automático, sempre dia ou sempre noite. Vale sobre `dayNight`. */
   daylight?: DaylightMode;
-  /** Tema visual: automático (segue o calendário; ver seasonalThemeFor), nenhum, Natal ou Halloween. */
+  /** Tema visual: automático (segue o calendário; ver seasonalThemeFor), nenhum, Natal, Halloween ou Cyberpunk. */
   theme?: OfficeTheme;
 }
 
-/** Tema que o renderer desenha: o escritório original ('none') ou um dos sazonais. */
-export type SeasonalTheme = 'none' | 'christmas' | 'halloween';
+/** Tema que o renderer desenha: o escritório original ('none'), um dos sazonais ou o cyberpunk (escolha manual). */
+export type SeasonalTheme = 'none' | 'christmas' | 'halloween' | 'cyberpunk';
 export type OfficeTheme = 'auto' | SeasonalTheme;
 
 /**

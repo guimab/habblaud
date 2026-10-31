@@ -17,6 +17,7 @@ import {
   uplinkBytes,
   worldErrorCode,
   worldSource,
+  worldThemeOf,
   type WorldCharacterInput,
 } from './world';
 
@@ -336,6 +337,15 @@ describe('de onde vêm os dados', () => {
 });
 
 // ------------------------------------------------------------------ Fase 2: prédio no mundo
+
+describe('tema do escritório x tema do prédio', () => {
+  it('o cyberpunk fica só no escritório: não vai ao prédio', () => {
+    expect(worldThemeOf('cyberpunk')).toBeNull();
+  });
+  it('os outros temas vão como estão', () => {
+    for (const t of ['auto', 'none', 'christmas', 'halloween'] as const) expect(worldThemeOf(t)).toBe(t);
+  });
+});
 
 describe('prédio: rotas locais da Fase 2', () => {
   it('última remessa, pausar, retomar, sair do mundo e tema vão para as rotas do contrato', async () => {

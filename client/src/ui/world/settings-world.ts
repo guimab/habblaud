@@ -16,6 +16,7 @@ import { access } from '../../net/access';
 import {
   buildingFromMeta,
   FAKE_CODE,
+  worldThemeOf,
   type WorldClient,
   type WorldDevice,
   type WorldErrorCode,
@@ -25,6 +26,7 @@ import {
   type WorldThemeChoice,
   type WorldVisibility,
 } from '../../net/world';
+import type { OfficeTheme } from '../../world/api';
 import { BuildingCard, SentDialog } from './building';
 import { buildBlocked } from './blocked';
 import { TRAITS, TRAIT_IDS, type TraitId } from '../../../../shared/world/traits';
@@ -354,14 +356,17 @@ export class WorldSettingsGroup {
   /**
    * A escolha de Aparência › Tema do escritório também vai para o prédio (PUT /api/world/theme), quando o World está
    * ligado e a conta aprovada. Se não der, a dica do tema mostra o erro (o escritório troca de tema do mesmo jeito).
+   * Tema que o prédio não tem (cyberpunk) não vira requisição: fica só no escritório.
    */
-  async onThemePicked(theme: WorldThemeChoice): Promise<void> {
+  async onThemePicked(theme: OfficeTheme): Promise<void> {
     const client = this.client;
+    const sent = worldThemeOf(theme);
+    if (!sent) return;
     this.themePickedAt = ++this.themeClock;
     if (!this.themeLinked || !client) return;
     const req = ++this.themeReq;
     this.themeInflight++;
-    const r = await client.setTheme(theme).finally(() => this.themeInflight--);
+    const r = await client.setTheme(sent).finally(() => this.themeInflight--);
     if (req !== this.themeReq) return;
     setText(this.themeError, r.ok ? '' : ` ${tr('Não deu para mandar o tema para o prédio: {0}', [worldErrorText(r.code, 'theme')])}`);
     setHidden(this.themeError, r.ok);
@@ -376,8 +381,10 @@ export class WorldSettingsGroup {
   private syncTheme(st: WorldStatus, askedAt: number): void {
     if (!this.themeLinked || st.state !== 'approved' || this.themeInflight > 0 || askedAt < this.themePickedAt) return;
     const pref = this.ctx.prefs.theme;
-    if (st.theme && st.theme !== pref) this.ctx.updatePrefs({ theme: st.theme });
-    else if (!st.theme && pref !== 'auto') void this.onThemePicked(pref);
+    const sent = worldThemeOf(pref);
+    if (!sent) return; // tema só do escritório (cyberpunk): o prédio segue com o dele
+    if (st.theme && st.theme !== sent) this.ctx.updatePrefs({ theme: st.theme });
+    else if (!st.theme && sent !== 'auto') void this.onThemePicked(sent);
   }
 
   /** Volta ao topo do corpo rolável da janela (a cada tela nova, o começo dela é o que importa). */

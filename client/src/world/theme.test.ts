@@ -22,6 +22,15 @@ describe('tema do escritório', () => {
       expect(seasonalThemeFor('none', date)).toBe('none');
       expect(seasonalThemeFor('christmas', date)).toBe('christmas');
       expect(seasonalThemeFor('halloween', date)).toBe('halloween');
+      expect(seasonalThemeFor('cyberpunk', date)).toBe('cyberpunk');
+    }
+  });
+
+  it('o cyberpunk é escolha manual: o automático nunca o escolhe', () => {
+    for (const year of [2026, 2028]) {
+      for (let d = new Date(year, 0, 1, 12); d.getFullYear() === year; d = new Date(year, d.getMonth(), d.getDate() + 1, 12)) {
+        expect(seasonalThemeFor('auto', d), d.toDateString()).not.toBe('cyberpunk');
+      }
     }
   });
 });

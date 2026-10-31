@@ -32,11 +32,20 @@ import type { IntroId } from '../../../shared/world/intro';
 import { parsePlayerName, playerNameKey } from '../../../shared/world/names-rules';
 import { GOODBYE_REASONS, UPLINK_ACK_ERRORS, type AwaySummary, type UplinkAckError, type WorldUplink } from '../../../shared/world/protocol';
 import { parseAwaySummary, summaryHasNews } from '../../../shared/world/scene';
-import { seasonalThemeFor } from '../world/api';
+import { seasonalThemeFor, type OfficeTheme } from '../world/api';
 import { emailLooksValid, passwordProblem, traitsValid, DEFAULT_VISIBILITY } from '../ui/world/world-model';
 
 export type WorldServerState = 'off' | 'logged_out' | 'waiting' | 'approved';
 export type WorldAccess = 'waiting' | 'approved';
+
+/**
+ * Tema de Aparência que o prédio no World também sabe desenhar. O cyberpunk é escolha só do escritório (o protocolo
+ * do prédio ainda não o tem): devolve null, e quem decide se manda algo ao prédio não manda nada nem deixa o status do
+ * prédio sobrescrever a preferência local.
+ */
+export function worldThemeOf(theme: OfficeTheme): WorldThemeChoice | null {
+  return theme === 'cyberpunk' ? null : theme;
+}
 
 // Os tipos do prédio são os do servidor local (shared/world/api.ts); a interface os importa daqui.
 export { WORLD_THEME_CHOICES };
@@ -748,7 +757,8 @@ export class FakeWorldApi implements WorldClient {
     const b = acc.building;
     if (!b || b.paused) return;
     const at = this.now();
-    const uplink: WorldUplink = { ...structuredClone(FAKE_UPLINK as WorldUplink), theme: seasonalThemeFor(this.theme, new Date(at)) };
+    const resolved = seasonalThemeFor(this.theme, new Date(at));
+    const uplink: WorldUplink = { ...structuredClone(FAKE_UPLINK as WorldUplink), theme: resolved === 'cyberpunk' ? 'none' : resolved };
     const bytes = uplinkBytes(uplink);
     const ack: WorldUplinkAck = this.rejectCode ? { ok: false, error: this.rejectCode, at } : { ok: true, at, bytes };
     b.last = { at, bytes, uplink, ack };

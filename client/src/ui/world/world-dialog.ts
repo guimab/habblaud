@@ -9,7 +9,8 @@
 // Dois modais ao mesmo tempo (o popup da lista de espera logo depois do cadastro, ou "Ver o que foi enviado"):
 // showModal() empilha na top layer, o Esc fecha só o de cima e o foco volta a esta janela quando ele fecha.
 import { tr } from '../../../../shared/i18n';
-import type { WorldSource, WorldThemeChoice } from '../../net/world';
+import type { WorldSource } from '../../net/world';
+import type { OfficeTheme } from '../../world/api';
 import type { UiComponent, UiContext } from '../context';
 import { h, iconButton, setHidden } from '../dom';
 import { ICONS } from '../icons';
@@ -22,7 +23,7 @@ const TITLE_ID = 'ui-world-dialog-title';
 /** O que as Configurações precisam do World: a dica do tema em Aparência e o envio do tema escolhido ao prédio. */
 export interface WorldThemeLink {
   readonly themeNote: HTMLElement;
-  onThemePicked(theme: WorldThemeChoice): Promise<void>;
+  onThemePicked(theme: OfficeTheme): Promise<void>;
 }
 
 export class WorldDialog implements UiComponent, WorldThemeLink {
@@ -71,7 +72,7 @@ export class WorldDialog implements UiComponent, WorldThemeLink {
     return this.group.themeNote;
   }
 
-  onThemePicked(theme: WorldThemeChoice): Promise<void> {
+  onThemePicked(theme: OfficeTheme): Promise<void> {
     return this.group.onThemePicked(theme);
   }
 

@@ -6,6 +6,8 @@ import type { SeasonalTheme } from '../api';
 import type { AreaLayout, WallSegment } from '../layout/types';
 
 const sprites = new Map<SeasonalProp, Sprite>();
+/** Paleta do tema cyberpunk: parede escura, neon amarelo (Night City) com emendas ciano e magenta. */
+const CYBER = { wall: '#191d29', floor: '#20263a', carpet: '#242b45', neon: '#fcee0a', cold: '#00e5ff' } as const;
 function prop(kind: SeasonalProp): Sprite {
   let sprite = sprites.get(kind);
   if (!sprite) {
@@ -27,7 +29,7 @@ export function seasonalCostume(theme: SeasonalTheme, seed: number): CharacterFr
 
 /** Reutiliza footprints de plantas: nenhuma nova colisão ou mudança de caminhos. */
 export function seasonalFurniture(theme: SeasonalTheme, kind: FurnitureKind, area: AreaLayout, seed: number): Sprite | null {
-  if (theme === 'none' || area.kind === 'restroom') return null;
+  if (theme === 'none' || theme === 'cyberpunk' || area.kind === 'restroom') return null;
   if (kind === 'plant_tall') {
     const first = area.furniture.find((f) => f.kind === 'plant_tall');
     if (!first || hash32(first.id) !== seed) return null;
@@ -38,11 +40,19 @@ export function seasonalFurniture(theme: SeasonalTheme, kind: FurnitureKind, are
 }
 
 export function seasonalRugColor(theme: SeasonalTheme, original: string): string {
+  if (theme === 'cyberpunk') return CYBER.carpet;
   return theme === 'christmas' ? '#a93649' : theme === 'halloween' ? '#60416f' : original;
+}
+
+/** Tom do piso da sala pelo tema: o cyberpunk escurece o porcelanato sem tirar a identidade da sala. */
+export function seasonalFloorTint(theme: SeasonalTheme, original: string | undefined): string | undefined {
+  if (!original || theme !== 'cyberpunk') return original;
+  return mix(original, CYBER.floor, 0.8);
 }
 
 export function seasonalWallStyle(theme: SeasonalTheme, original: WallStyle): WallStyle {
   if (theme === 'none' || original.pattern === 'glass') return original;
+  if (theme === 'cyberpunk') return { ...original, base: mix(original.base, CYBER.wall, 0.8), trim: CYBER.neon };
   return { ...original, base: mix(original.base, theme === 'christmas' ? '#ffe3b4' : '#bc97d1', 0.18), trim: theme === 'christmas' ? '#4e7756' : '#725486' };
 }
 
@@ -52,6 +62,18 @@ export function decorateSeasonalRug(ctx: CanvasRenderingContext2D, theme: Season
   const x = Math.round(rug.x), y = Math.round(rug.y), w = Math.floor(rug.w), h = Math.floor(rug.h);
   if (w < 25 || h < 16) return;
   ctx.save();
+  if (theme === 'cyberpunk') {
+    // Tapete do tema: faixas de sinalização (amarelo de Night City, emendas ciano) nas duas bordas.
+    ctx.fillStyle = CYBER.neon;
+    ctx.fillRect(x + 4, y + 4, w - 8, 1);
+    ctx.fillRect(x + 4, y + h - 5, w - 8, 1);
+    for (let i = 0, cx = x + 10; cx < x + w - 10; cx += 14, i++) {
+      ctx.fillStyle = i % 3 === 2 ? CYBER.cold : CYBER.neon;
+      ctx.fillRect(cx, Math.round(y + h / 2) - 1, 7, 2);
+    }
+    ctx.restore();
+    return;
+  }
   ctx.fillStyle = theme === 'christmas' ? '#ddb66e' : '#e5a457';
   ctx.fillRect(x + 4, y + 4, w - 8, 1);
   ctx.fillRect(x + 4, y + h - 5, w - 8, 1);
@@ -81,6 +103,21 @@ export function decorateSeasonalWall(ctx: CanvasRenderingContext2D, theme: Seaso
   if (theme === 'none' || wall.kind !== 'face') return;
   ctx.save();
   const x0 = Math.round(wall.x + 3), end = Math.floor(wall.x + wall.w - 3), y = Math.round(wall.y + 5);
+  if (theme === 'cyberpunk') {
+    // Tubo de neon reto no alto da parede (sem a curva da guirlanda), com emendas frias ciano.
+    for (let x = x0; x < end; x++) {
+      if (wall.doorways?.some((d) => x >= d.x - 1 && x < d.x + d.w + 1)) continue;
+      ctx.fillStyle = CYBER.neon;
+      ctx.fillRect(x, y, 1, 1);
+      if ((x - x0) % 16 === 8) {
+        ctx.fillStyle = CYBER.cold;
+        ctx.fillRect(x, y - 1, 3, 1);
+        ctx.fillRect(x, y, 1, 2);
+      }
+    }
+    ctx.restore();
+    return;
+  }
   for (let x = x0; x < end; x++) {
     if (wall.doorways?.some((d) => x >= d.x - 1 && x < d.x + d.w + 1)) continue;
     const sag = Math.round(Math.sin(((x - x0) % 48) / 48 * Math.PI) * 3);
@@ -121,7 +158,7 @@ export function decorateSeasonalWall(ctx: CanvasRenderingContext2D, theme: Seaso
 
 /** Guirlandas nas molduras dos elevadores (sem cobrir a porta animada). */
 export function decorateElevator(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, x: number, y: number): void {
-  if (theme === 'none') return;
+  if (theme === 'none' || theme === 'cyberpunk') return;
   const sprite = prop(theme === 'christmas' ? 'wreath' : 'bat');
   ctx.drawImage(sprite.canvas, Math.round(x - sprite.ax), Math.round(y - 19 - sprite.ay));
 }
@@ -134,8 +171,9 @@ function glowSprite(theme: SeasonalTheme): HTMLCanvasElement {
     canvas.width = canvas.height = 34;
     const ctx = canvas.getContext('2d')!;
     const glow = ctx.createRadialGradient(17, 17, 1, 17, 17, 17);
-    glow.addColorStop(0, theme === 'christmas' ? '#ffd58b' : '#d8a5ed');
-    glow.addColorStop(1, 'rgba(255,220,180,0)');
+    const halo = theme === 'cyberpunk' ? CYBER.neon : theme === 'christmas' ? '#ffd58b' : '#d8a5ed';
+    glow.addColorStop(0, halo);
+    glow.addColorStop(1, halo === CYBER.neon ? 'rgba(252,238,10,0)' : 'rgba(255,220,180,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, 34, 34);
     glows.set(theme, canvas);
@@ -158,7 +196,7 @@ export function drawSeasonalLights(ctx: CanvasRenderingContext2D, theme: Seasona
       ctx.globalAlpha = light * 0.3;
       ctx.drawImage(glowSprite(theme), Math.round(x - 17), wall.y - 8);
       ctx.globalAlpha = light * 0.85;
-      ctx.fillStyle = theme === 'christmas' ? '#ffe4a9' : '#ffd181';
+      ctx.fillStyle = theme === 'cyberpunk' ? CYBER.cold : theme === 'christmas' ? '#ffe4a9' : '#ffd181';
       ctx.fillRect(Math.round(x), wall.y + 9, 2, 2);
     }
     ctx.restore();

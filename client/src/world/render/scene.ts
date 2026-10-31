@@ -6,7 +6,7 @@ import type { AreaLayout, WallItemPlacement, WallSegment } from '../layout/types
 import type { RoomState } from '../sim/room-state';
 import type { WallArtAsset, WorldAssets } from '../assets';
 import type { SeasonalTheme } from '../api';
-import { decorateSeasonalRug, decorateSeasonalWall, seasonalRugColor, seasonalWallStyle } from './seasonal';
+import { decorateSeasonalRug, decorateSeasonalWall, seasonalFloorTint, seasonalRugColor, seasonalWallStyle } from './seasonal';
 
 /** Margem acima da área no cache de paredes (itens que passam do topo da face). */
 export const WALL_MARGIN = 16;
@@ -218,13 +218,14 @@ export function buildAreaVis(art: ArtModule, layout: AreaLayout, room: RoomState
   fctx.translate(-px.x, -px.y);
   for (const f of layout.floors) {
     try {
-      art.drawFloor(fctx, f.kind, f.x, f.y, f.w, f.h, { seed: f.seed, tint: f.tint, tint2: f.tint2 });
+      art.drawFloor(fctx, f.kind, f.x, f.y, f.w, f.h, { seed: f.seed, tint: seasonalFloorTint(theme, f.tint), tint2: seasonalFloorTint(theme, f.tint2) });
     } catch {
       fctx.fillStyle = '#d9dde2';
       fctx.fillRect(f.x, f.y, f.w, f.h);
     }
   }
-  if (layout.floorTint) tintFloor(fctx, px, layout.floorTint);
+  const floorTint = seasonalFloorTint(theme, layout.floorTint);
+  if (floorTint) tintFloor(fctx, px, floorTint);
   for (const rug of layout.rugs) {
     const color = seasonalRugColor(theme, rug.color);
     try {

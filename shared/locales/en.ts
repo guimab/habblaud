@@ -633,6 +633,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Tema do escritório": "Office theme",
   "Natal": "Christmas",
   "Halloween": "Halloween",
+  "Cyberpunk": "Cyberpunk",
+  "Cyberpunk: escritório escuro com neon, escolha fixa (o automático não usa). Fica melhor com o ciclo dia/noite em \"Sempre noite\".": "Cyberpunk: dark office with neon, a fixed choice (automatic never uses it). Looks best with the day/night cycle on \"Always night\".",
   "Automático: Halloween em outubro e Natal de 1º de novembro a 26 de dezembro; no resto do ano, o visual original. Nenhum: sempre o original.": "Automatic: Halloween in October and Christmas from November 1 to December 26; the rest of the year, the original look. None: always the original.",
   "Idioma da interface": "Interface language",
   "Os textos das atividades vêm do servidor: seguem HABBLAUD_LANG ou o idioma do sistema onde o Habblaud roda (o inglês, só com HABBLAUD_LANG=en).": "Activity texts come from the server: they follow HABBLAUD_LANG or the language of the system Habblaud runs on (English only with HABBLAUD_LANG=en).",
