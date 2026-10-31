@@ -1,4 +1,5 @@
 // Barra lateral: busca, filtro por conta e a lista de salas -> agentes -> subagentes.
+import { pathsLabel } from './project-model';
 import type { AccountInfo, AgentInfo } from '../../../shared/types';
 import { roomTheme } from '../art';
 import type { UiComponent, UiContext } from './context';
@@ -250,7 +251,7 @@ export class Sidebar implements UiComponent {
     const present = g.agents.filter((a) => a.status !== 'offline').length;
     setText(r.count, String(present));
     setTitle(r.count, plural(present, tr('agente'), tr('agentes')));
-    setText(r.path, shortPath(g.room.path));
+    setText(r.path, g.room.project ? pathsLabel({ ...g.room, paths: (g.room.paths ?? []).map(shortPath) }) || tr('projeto sem pasta') : shortPath(g.room.path));
     setTitle(r.head, tr('{0}\nClique para ver a sala', [g.room.path]));
     setAttr(r.head, 'aria-label', tr('Sala {0}, {1}', [g.room.name, plural(present, tr('agente'), tr('agentes'))]));
     r.accs.sync(g.accounts.map((id) => this.ctx.account(id) ?? id));

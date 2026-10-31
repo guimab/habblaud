@@ -404,6 +404,8 @@ export interface AccessInfo {
   terminal: boolean;
   /** Pode abrir agentes novos no app do Claude (POST /api/spawn). */
   spawn: boolean;
+  /** Pode criar e alterar projetos (/api/projects; remoto: HABBLAUD_REMOTE_ALLOW=projects). */
+  projects?: boolean;
   /**
    * Pode usar a conta do Habblaud World (/api/world/*): recurso ligado (HABBLAUD_WORLD), trava do terminal e porta local
    * com Host local. Ausente em servidores antigos.

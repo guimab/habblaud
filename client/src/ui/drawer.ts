@@ -41,6 +41,8 @@ import {
 import { access } from '../net/access';
 import { PermissionCard } from './permission';
 import { canRenameRoom } from './roomrename';
+import { ProjectSection } from './project';
+import { pathsLabel } from './project-model';
 import { accountChipLabel, accountProvider, CODEX_LIVE_HINT, codexApprovalLabel, providerOf } from './provider';
 import { ptyControllable } from './ptyapi';
 import { createAgentRow, updateAgentRow } from './rows';
@@ -813,6 +815,7 @@ class RoomView {
   private tasks: KeyedList<{ task: TaskItem; owner: string; key: string }>;
   private feed: KeyedList<FeedItem>;
   private feedSec: ReturnType<typeof section>;
+  private project: ProjectSection;
   private newBtn: HTMLButtonElement;
   private newMsg: HTMLElement;
 
@@ -839,6 +842,7 @@ class RoomView {
     centerBtn.innerHTML = ICONS.center;
     centerBtn.append(h('span', { text: tr('Centralizar') }));
     this.gone = h('p', { class: 'ui-gone', text: tr('Esta sala foi fechada: todos os agentes saíram.'), hidden: true });
+    this.project = new ProjectSection(ctx);
 
     const accsEl = h('div', { class: 'ui-acc-list' });
     this.accs = new KeyedList<string>(accsEl, {
@@ -883,6 +887,7 @@ class RoomView {
       this.gone,
       h('div', { class: 'ui-status' }, accsEl, h('span', { class: 'ui-status__actions' }, this.newBtn, centerBtn)),
       this.newMsg,
+      this.project.el,
       this.agentsSec.el,
       this.tasksSec.el,
       this.feedSec.el,
@@ -921,8 +926,9 @@ class RoomView {
     const r = this.last;
     if (!r) return;
     setText(this.name, r.name);
-    setText(this.path, shortPath(r.path));
-    setTitle(this.path, r.path);
+    setText(this.path, r.project ? pathsLabel({ ...r, paths: (r.paths ?? []).map(shortPath) }) || tr('projeto sem pasta') : shortPath(r.path));
+    setTitle(this.path, r.project ? (r.paths ?? []).join('\n') : r.path);
+    this.project.render(r, !!live);
     try {
       setStyleVar(this.swatch, '--room', roomTheme(r.seed).accent);
     } catch {
@@ -930,7 +936,7 @@ class RoomView {
     }
     setHidden(this.gone, !!live);
     setHidden(this.renameBtn, !live || !canRenameRoom(this.ctx, r.id));
-    setHidden(this.newBtn, !this.pty.enabled);
+    setHidden(this.newBtn, !this.pty.enabled || !r.path);
 
     const snap = this.ctx.store.snapshot;
     const agents = (snap?.agents ?? []).filter((a) => a.roomId === r.id);
