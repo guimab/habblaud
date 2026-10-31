@@ -4,6 +4,8 @@ import { DEFAULT_SOUND_SETTINGS, sanitizeSoundSettings, type SoundSettings } fro
 import type { DaylightMode, WorldOptions } from '../world/api';
 import { DEFAULT_WORLD_OPTIONS } from '../world/api';
 
+import { AGENT_PANEL_DEFAULT_WIDTH, AGENT_PANEL_MIN_WIDTH, AGENT_PANEL_MAX_WIDTH } from './agent-panel-model';
+
 export const PREFS_KEY = 'habblaud:prefs';
 
 export interface UiPrefs {
@@ -21,6 +23,8 @@ export interface UiPrefs {
   browserNotifications: boolean;
   sidebarOpen: boolean;
   feedOpen: boolean;
+  /** Largura desktop preferida; resize da viewport não sobrescreve esta preferência. */
+  agentPanelWidth: number;
   /** Contas ocultas na barra lateral (AccountInfo.id). */
   hiddenAccounts: string[];
   /** Habblaud World: aviso quando o primeiro visitante entra no seu prédio (a cada conexão). Ligado por padrão. */
@@ -38,6 +42,7 @@ export const DEFAULT_PREFS: UiPrefs = {
   browserNotifications: false,
   sidebarOpen: true,
   feedOpen: true,
+  agentPanelWidth: AGENT_PANEL_DEFAULT_WIDTH,
   hiddenAccounts: [],
   worldVisitNotify: true,
 };
@@ -64,6 +69,9 @@ export function sanitizePrefs(raw: unknown): UiPrefs {
     browserNotifications: bool(o.browserNotifications, d.browserNotifications),
     sidebarOpen: bool(o.sidebarOpen, d.sidebarOpen),
     feedOpen: bool(o.feedOpen, d.feedOpen),
+    agentPanelWidth: typeof o.agentPanelWidth === 'number' && Number.isFinite(o.agentPanelWidth)
+      ? Math.min(AGENT_PANEL_MAX_WIDTH, Math.max(AGENT_PANEL_MIN_WIDTH, o.agentPanelWidth))
+      : AGENT_PANEL_DEFAULT_WIDTH,
     hiddenAccounts: Array.isArray(o.hiddenAccounts) ? o.hiddenAccounts.filter((x): x is string => typeof x === 'string').slice(0, 20) : [],
     worldVisitNotify: bool(o.worldVisitNotify, d.worldVisitNotify),
   };

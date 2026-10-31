@@ -347,6 +347,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
     root.classList.toggle('has-feed', panels.feed);
     root.classList.toggle('has-drawer', selection !== null && !drawer.floating);
     root.classList.toggle('is-narrow', ctx.isNarrow());
+    drawer.syncLayout();
     area.sync(opts);
   }
 

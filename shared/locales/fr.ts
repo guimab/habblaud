@@ -292,6 +292,7 @@ export const FR: Readonly<Record<string, string>> = {
   "Atividade recente": "Activité récente",
   "Copiar caminho": "Copier le chemin",
   "Fechar detalhes (Esc)": "Fermer les détails (Échap)",
+  "Redimensionar painel de detalhes": "Redimensionner le panneau de détails",
   "Subagente": "Sous-agent",
   "Agente": "Agent",
 

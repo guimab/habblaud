@@ -50,7 +50,8 @@ import { ptyControllable } from './ptyapi';
 import { createAgentRow, updateAgentRow } from './rows';
 import { SocialSection } from './social';
 import { TERMINAL_UNAVAILABLE_HINT, type TerminalControl } from './terminal';
-import { Movable } from './movable';
+import { AGENT_PANEL_DEFAULT_WIDTH, AGENT_PANEL_MAX_WIDTH, clampPanelWidth } from './agent-panel-model';
+import { INSET_GAP } from './viewport';
 import type { PtyControl } from './pty';
 import { richText } from './usage';
 import {
@@ -1048,8 +1049,11 @@ export class Drawer implements UiComponent {
   private roomView: RoomView;
   private mode: 'agent' | 'room' | null = null;
   private heading: HTMLElement;
-  private movable: Movable;
-  /** Avisado quando a gaveta é solta ou volta ao lugar (a área livre do escritório muda). */
+  private resizeHandle: HTMLElement;
+  private width = AGENT_PANEL_DEFAULT_WIDTH;
+  private draftWidth: number | undefined;
+  private resizing: { pointerId: number; x: number; width: number } | null = null;
+  /** Avisado quando a largura muda (a área livre do escritório muda). */
   onLayoutChange: (() => void) | null = null;
 
   constructor(
@@ -1069,8 +1073,42 @@ export class Drawer implements UiComponent {
       bar,
       this.body,
     );
-    // Arrastar pela barra solta a gaveta: flutuante, ela não cobre mais a lateral do escritório.
-    this.movable = new Movable(this.el, bar, { key: 'habblaud.move.drawer', enabled: () => !ctx.isNarrow(), onChange: () => this.onLayoutChange?.() });
+    // Só a borda redimensiona. A barra não solta o painel, nem restaura posições flutuantes antigas.
+    this.resizeHandle = h('div', {
+      class: 'ui-drawer__resize', role: 'separator', tabIndex: 0,
+      attrs: { 'aria-label': tr('Redimensionar painel de detalhes'), 'aria-orientation': 'vertical', 'aria-controls': 'ui-drawer' },
+    });
+    this.el.prepend(this.resizeHandle);
+    this.resizeHandle.addEventListener('pointerdown', (e) => {
+      if (this.resizing || e.button !== 0 || !this.isOpen || ctx.isNarrow()) return;
+      e.preventDefault();
+      this.resizeHandle.focus({ preventScroll: true });
+      this.resizing = { pointerId: e.pointerId, x: e.clientX, width: this.width };
+      this.resizeHandle.setPointerCapture(e.pointerId);
+    });
+    this.resizeHandle.addEventListener('pointermove', (e) => {
+      if (this.resizing?.pointerId !== e.pointerId) return;
+      this.draftWidth = this.resizing.width + this.resizing.x - e.clientX;
+      this.syncLayout();
+      this.onLayoutChange?.();
+    });
+    this.resizeHandle.addEventListener('pointerup', (e) => this.endResize(e.pointerId, true));
+    this.resizeHandle.addEventListener('pointercancel', (e) => this.endResize(e.pointerId, false));
+    this.resizeHandle.addEventListener('lostpointercapture', (e) => this.endResize(e.pointerId, false));
+    this.resizeHandle.addEventListener('keydown', (e) => {
+      if (ctx.isNarrow() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.setWidth(this.width + (e.key === 'ArrowLeft' ? 16 : -16));
+    });
+    this.resizeHandle.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); }
+    });
+    addEventListener('resize', () => {
+      if (this.resizing) this.endResize(this.resizing.pointerId, false);
+      this.syncLayout();
+      this.onLayoutChange?.();
+    });
     this.el.inert = true;
   }
 
@@ -1078,9 +1116,46 @@ export class Drawer implements UiComponent {
     return this.mode !== null;
   }
 
-  /** Solta do lugar (arrastada pela barra). */
+  /** Compatibilidade com FreeArea: o painel de detalhes agora é sempre docked. */
   get floating(): boolean {
-    return this.movable.floating;
+    return false;
+  }
+
+  /** Mede sem depender de transform de abertura; viewport resize nunca grava a preferência. */
+  syncLayout(): void {
+    const css = getComputedStyle(this.ctx.root);
+    const gap = parseFloat(css.getPropertyValue('--gap')) || 0;
+    const sidebar = this.ctx.root.querySelector<HTMLElement>('.ui-sidebar');
+    const side = !this.ctx.isNarrow() && this.ctx.isPanelOpen('sidebar') && sidebar
+      ? sidebar.offsetLeft + sidebar.offsetWidth + INSET_GAP : 0;
+    const viewport = Math.max(0, innerWidth - gap - INSET_GAP);
+    const requested = this.draftWidth ?? this.ctx.prefs.agentPanelWidth ?? AGENT_PANEL_DEFAULT_WIDTH;
+    this.width = clampPanelWidth(requested, viewport, side);
+    setStyleVar(this.ctx.root, '--drawer-w', `${this.width}px`);
+    setHidden(this.resizeHandle, this.ctx.isNarrow());
+    setAttr(this.resizeHandle, 'aria-valuenow', String(this.width));
+    setAttr(this.resizeHandle, 'aria-valuemin', String(clampPanelWidth(0, viewport, side)));
+    setAttr(this.resizeHandle, 'aria-valuemax', String(clampPanelWidth(AGENT_PANEL_MAX_WIDTH, viewport, side)));
+  }
+
+  private setWidth(width: number): void {
+    const previous = this.width;
+    this.draftWidth = width;
+    this.syncLayout();
+    if (this.width !== previous) this.ctx.updatePrefs({ agentPanelWidth: this.width });
+    this.draftWidth = undefined;
+    this.onLayoutChange?.();
+  }
+
+  private endResize(pointerId: number, save: boolean): void {
+    if (this.resizing?.pointerId !== pointerId) return;
+    const changed = this.width !== this.resizing.width;
+    this.resizing = null;
+    if (save && changed) this.ctx.updatePrefs({ agentPanelWidth: this.width });
+    this.draftWidth = undefined;
+    if (this.resizeHandle.hasPointerCapture(pointerId)) this.resizeHandle.releasePointerCapture(pointerId);
+    this.syncLayout();
+    this.onLayoutChange?.();
   }
 
   toggleFollow(): void {
@@ -1094,6 +1169,7 @@ export class Drawer implements UiComponent {
       // Gaveta fechada ou fora do agente: o editor fecha, e ao reabrir começa do estado atual do agente.
       if (this.mode === 'agent') this.agentView.character.close();
       this.mode = mode;
+      if (mode === null && this.resizing) this.endResize(this.resizing.pointerId, false);
       this.body.replaceChildren(...(mode === 'agent' ? [this.agentView.el] : mode === 'room' ? [this.roomView.el] : []));
       this.body.scrollTop = 0;
       this.el.classList.toggle('is-open', mode !== null);

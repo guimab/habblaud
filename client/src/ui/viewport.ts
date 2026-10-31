@@ -331,6 +331,8 @@ export class FreeArea {
       'keydown',
       (e) => {
         if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+        // As setas horizontais na borda do painel redimensionam, não assumem a câmera nem cancelam o foco.
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && e.target instanceof HTMLElement && e.target.closest('.ui-drawer__resize')) return;
         if (CAMERA_KEYS.has(e.key)) this.intent = null;
       },
       true,

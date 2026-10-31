@@ -38,7 +38,7 @@
   --top-h: 64px;
   --gap: 10px;
   --side-w: 304px;
-  --drawer-w: 380px;
+  --drawer-w: 560px;
   --feed-h: 200px;
   --feed-head: 38px;
   --feed-max: 700px;
@@ -2006,6 +2006,25 @@
   transform: none;
   visibility: visible;
   transition: transform 0.34s var(--ease);
+}
+
+.ui-drawer__resize {
+  position: absolute;
+  z-index: 5;
+  left: -5px;
+  top: 4px;
+  bottom: 4px;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  border-radius: 4px;
+}
+
+.ui-drawer__resize:focus-visible,
+.ui-drawer__resize:hover {
+  background: var(--ui-line);
+  outline: 2px solid var(--ui-muted);
 }
 
 .ui-drawer__bar {
@@ -4034,7 +4053,7 @@
 @media (max-width: 900px) {
   .ui-root {
     --side-w: min(340px, calc(100vw - var(--gap) * 2));
-    --drawer-w: min(400px, calc(100vw - var(--gap) * 2));
+    --drawer-w: min(560px, calc(100vw - var(--gap) * 2));
   }
 
   .ui-sidebar {
@@ -4044,7 +4063,10 @@
 
   .ui-drawer {
     z-index: 41;
+    max-width: calc(100vw - var(--gap) * 2);
   }
+
+  .ui-drawer__resize { display: none; }
 
   .ui-side__close {
     display: inline-grid;
@@ -7623,23 +7645,12 @@ html.is-replay #world {
   cursor: grabbing;
 }
 
-.ui-term.is-floating,
-.ui-drawer.is-floating {
+.ui-term.is-floating {
   right: auto;
   bottom: auto;
   overflow: hidden;
   transition: none;
   animation: none;
-}
-
-.ui-drawer.is-floating {
-  z-index: 25;
-  transform: none;
-  box-shadow: 0 24px 60px rgba(5, 7, 12, 0.55);
-}
-
-.ui-drawer.is-floating:not(.is-open) {
-  visibility: hidden;
 }
 
 .is-dragging {

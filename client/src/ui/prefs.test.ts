@@ -24,6 +24,17 @@ function listableStorage(initial: Record<string, string> = {}) {
 }
 
 describe('preferências', () => {
+  it.each([null, '624', Number.NaN, Number.POSITIVE_INFINITY])('largura corrompida %s cai no padrão', (agentPanelWidth) => {
+    expect(sanitizePrefs({ agentPanelWidth }).agentPanelWidth).toBe(560);
+  });
+  it('persiste a largura preferida do painel e limita valores finitos', () => {
+    expect(sanitizePrefs({}).agentPanelWidth).toBe(560);
+    expect(sanitizePrefs({ agentPanelWidth: 100 }).agentPanelWidth).toBe(400);
+    expect(sanitizePrefs({ agentPanelWidth: 9999 }).agentPanelWidth).toBe(720);
+    const storage = memoryStorage();
+    savePrefs(storage, { ...DEFAULT_PREFS, agentPanelWidth: 624 });
+    expect(loadPrefs(storage).agentPanelWidth).toBe(624);
+  });
   it('usa o padrão sem armazenamento ou com JSON inválido', () => {
     expect(loadPrefs(null)).toEqual(DEFAULT_PREFS);
     expect(loadPrefs(memoryStorage({ [PREFS_KEY]: '{oops' }))).toEqual(DEFAULT_PREFS);

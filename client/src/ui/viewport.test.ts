@@ -16,6 +16,19 @@ const desktop: PanelGeometry = {
 const g = INSET_GAP;
 
 describe('computeInsets', () => {
+  it('mede o painel de 560 px e mantém a área livre do escritório', () => {
+    const geometry = { ...desktop, drawerLeft: 1440 - 560 - 10 };
+    const ins = computeInsets(geometry, { sidebar: true, feed: false, drawer: true, narrow: false });
+    expect(ins.right).toBe(560 + 10 + g);
+    expect(geometry.vw - ins.left - ins.right).toBeGreaterThanOrEqual(320);
+  });
+  it('mede a nova largura após resize sem usar a largura anterior', () => {
+    const flags = { sidebar: true, feed: false, drawer: true, narrow: false };
+    const first = computeInsets({ ...desktop, drawerLeft: 1440 - 560 - 10 }, flags);
+    const next = computeInsets({ ...desktop, vw: 1280, drawerLeft: 1280 - 620 - 10 }, flags);
+    expect(next.right - first.right).toBe(60);
+    expect(1280 - next.left - next.right).toBe(320);
+  });
   it('desktop: barra superior, barra lateral aberta e feed aberto', () => {
     expect(computeInsets(desktop, { sidebar: true, feed: true, drawer: false, narrow: false })).toEqual({
       top: 64 + g,
