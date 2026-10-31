@@ -71,4 +71,21 @@ describe('tema cyberpunk: qual enfeite troca cada planta', () => {
     expect(seasonalPropFor('halloween', 'plant_small', 'room', true, 3)).toBe('pumpkin');
     expect(seasonalPropFor('halloween', 'plant_tall', 'room', false, 3)).toBeNull();
   });
+
+  it('no cyberpunk os móveis do escritório viram as peças de neon', () => {
+    expect(seasonalPropFor('cyberpunk', 'binder_shelf', 'room', false, 3)).toBe('rack');
+    expect(seasonalPropFor('cyberpunk', 'trash_bin', 'room', false, 3)).toBe('bin');
+    expect(seasonalPropFor('cyberpunk', 'vending_machine', 'room', false, 3)).toBe('vending');
+    expect(seasonalPropFor('cyberpunk', 'floor_lamp', 'room', false, 3)).toBe('lamp_neon');
+    expect(seasonalPropFor('cyberpunk', 'arcade', 'room', false, 3)).toBe('arcade_neon');
+  });
+
+  it('os móveis de neon são só do cyberpunk, e o banheiro fica de fora', () => {
+    for (const kind of ['binder_shelf', 'trash_bin', 'vending_machine', 'floor_lamp', 'arcade'] as const) {
+      for (const theme of ['none', 'christmas', 'halloween'] as const) {
+        expect(seasonalPropFor(theme, kind, 'room', false, 3), `${theme} ${kind}`).toBeNull();
+      }
+      expect(seasonalPropFor('cyberpunk', kind, 'restroom', false, 3), kind).toBeNull();
+    }
+  });
 });

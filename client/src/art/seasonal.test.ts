@@ -74,4 +74,34 @@ describe('acessórios sazonais', () => {
       expect(bounds.y + bounds.h).toBeLessThan(buf.h);
     }
   });
+
+  it('os móveis do cyberpunk cabem na folha 1x1 e ficam ancorados na base do footprint', () => {
+    for (const kind of ['rack', 'bin', 'vending', 'lamp_neon', 'arcade_neon'] as const) {
+      const { buf, ax, ay } = renderSeasonalProp(kind);
+      const bounds = buf.bounds()!;
+      expect(bounds.x, kind).toBeGreaterThanOrEqual(0);
+      expect(bounds.y, kind).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.w, kind).toBeLessThanOrEqual(buf.w);
+      expect(bounds.y + bounds.h, kind).toBeLessThanOrEqual(buf.h);
+      expect(ax, kind).toBe(12);
+      expect(ay - buf.oy, kind).toBe(16); // base do footprint de 1x1: trocar não desloca o móvel
+      expect(bounds.w, kind).toBeGreaterThanOrEqual(9);
+      expect(buf.countOpaque(), kind).toBeGreaterThan(120);
+    }
+  });
+
+  it('a luminária mantém o ponto de luz e o fliperama, a área da tela do jogo', () => {
+    const lamp = renderSeasonalProp('lamp_neon');
+    const glow = lamp.rects?.glow;
+    expect(glow).toBeTruthy();
+    expect(glow!.w).toBeGreaterThanOrEqual(8);
+    expect(glow!.y).toBeLessThan(lamp.buf.h / 2); // no alto, onde está o tubo
+
+    const arcade = renderSeasonalProp('arcade_neon');
+    const screen = arcade.rects?.screen;
+    expect(screen).toBeTruthy();
+    expect(screen!.w).toBeGreaterThan(5);
+    expect(screen!.x + screen!.w).toBeLessThanOrEqual(arcade.buf.w);
+    expect(screen!.y).toBeLessThan(arcade.buf.h / 2);
+  });
 });

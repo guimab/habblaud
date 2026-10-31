@@ -1,10 +1,30 @@
 // Decorações procedurais em pixel art. Mesma escala dos móveis do escritório.
 import { PixelBuf } from './core/pixbuf';
 import type { BufSprite } from './core/sprite';
+import { arcadeNeon, binNeon, lampNeon, serverRack, vendingNeon } from './furniture/cyber';
 
-export type SeasonalProp = 'tree' | 'gift' | 'pumpkin' | 'ghost' | 'wreath' | 'bat' | 'holo' | 'terminal';
+export type SeasonalProp =
+  | 'tree'
+  | 'gift'
+  | 'pumpkin'
+  | 'ghost'
+  | 'wreath'
+  | 'bat'
+  | 'holo'
+  | 'terminal'
+  // Móveis do cyberpunk (furniture/cyber.ts): peças que trocam móveis do escritório mantendo o footprint 1x1.
+  | 'rack'
+  | 'bin'
+  | 'vending'
+  | 'lamp_neon'
+  | 'arcade_neon';
 
 export function renderSeasonalProp(kind: SeasonalProp): BufSprite {
+  if (kind === 'rack') return serverRack().base;
+  if (kind === 'bin') return binNeon().base;
+  if (kind === 'vending') return vendingNeon().base;
+  if (kind === 'lamp_neon') return lampNeon().base;
+  if (kind === 'arcade_neon') return arcadeNeon().base;
   const b = new PixelBuf(40, 64);
   const rect = (x: number, y: number, w: number, h: number, c: string) => b.rect(x, y, w, h, c);
   if (kind === 'tree') {

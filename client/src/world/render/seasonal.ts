@@ -10,12 +10,13 @@ const sprites = new Map<SeasonalProp, Sprite>();
 function prop(kind: SeasonalProp): Sprite {
   let sprite = sprites.get(kind);
   if (!sprite) {
-    const { buf, ax, ay } = renderSeasonalProp(kind);
+    const { buf, ax, ay, rects } = renderSeasonalProp(kind);
     const canvas = document.createElement('canvas');
     canvas.width = buf.w;
     canvas.height = buf.h;
     canvas.getContext('2d')!.putImageData(new ImageData(buf.data, buf.w, buf.h), 0, 0);
-    sprites.set(kind, sprite = { canvas, ax, ay });
+    // Os rects vão junto: a luminária de neon precisa do rects.glow (luz) e o fliperama, do rects.screen do jogo.
+    sprites.set(kind, sprite = { canvas, ax, ay, rects });
   }
   return sprite;
 }
@@ -27,9 +28,19 @@ export function seasonalCostume(theme: SeasonalTheme, seed: number): CharacterFr
   return undefined;
 }
 
+/** Móveis que o cyberpunk troca por peças de neon (mesmo footprint 1x1: nada se desloca). */
+const CYBER_FURNITURE: Partial<Record<FurnitureKind, SeasonalProp>> = {
+  binder_shelf: 'rack',
+  trash_bin: 'bin',
+  vending_machine: 'vending',
+  floor_lamp: 'lamp_neon',
+  arcade: 'arcade_neon',
+};
+
 /**
- * Qual enfeite do tema troca este móvel (puro, sem canvas). Reutiliza footprints de plantas: nenhuma nova colisão
- * ou mudança de caminhos. No cyberpunk a primeira planta grande vira quiosque holográfico e a pequena, um terminal.
+ * Qual enfeite do tema troca este móvel (puro, sem canvas). Reutiliza footprints: nenhuma nova colisão ou mudança
+ * de caminhos. No cyberpunk a primeira planta grande vira quiosque holográfico, a pequena um terminal de dados, e
+ * estante/lixeira/máquina de venda/luminária/fliperama viram as peças de neon de `art/furniture/cyber.ts`.
  */
 export function seasonalPropFor(
   theme: SeasonalTheme,
@@ -39,6 +50,10 @@ export function seasonalPropFor(
   seed: number,
 ): SeasonalProp | null {
   if (theme === 'none' || areaKind === 'restroom') return null;
+  if (theme === 'cyberpunk') {
+    const cyber = CYBER_FURNITURE[kind];
+    if (cyber) return cyber;
+  }
   if (kind === 'plant_tall') {
     if (!firstPlantTall) return null;
     if (theme === 'cyberpunk') return 'holo';
