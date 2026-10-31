@@ -2,6 +2,7 @@
 import { pathsLabel } from './project-model';
 import type { AccountInfo, AgentInfo } from '../../../shared/types';
 import { roomTheme } from '../art';
+import { access } from '../net/access';
 import type { UiComponent, UiContext } from './context';
 import { moveAgent, orderAgents } from './agentorder';
 import { moveRoom, orderRooms } from './roomorder';
@@ -9,6 +10,7 @@ import { h, iconButton, KeyedList, setAttr, setHidden, setStyleVar, setText, set
 import { plural, shortPath } from './format';
 import { ICONS } from './icons';
 import { groupRooms, type AgentNode, type RoomGroup } from './model';
+import { NewProjectRow } from './newproject';
 import { officeIsEmpty } from './overlays';
 import { createAgentRow, updateAgentRow } from './rows';
 import { createAccountChip, createProgress, updateAccountChip, updateProgress } from './widgets';
@@ -56,6 +58,9 @@ export class Sidebar implements UiComponent {
   private empty: HTMLElement;
   private emptyText: HTMLElement;
   private clearBtn: HTMLButtonElement;
+  /** Criar projeto pela interface: a barra lateral é o único lugar sempre visível. */
+  private newProject: NewProjectRow;
+  private newProjectBtn: HTMLButtonElement;
   private lastSelKey = '';
 
   constructor(private ctx: UiContext) {
@@ -129,11 +134,21 @@ export class Sidebar implements UiComponent {
     this.empty = h('div', { class: 'ui-side__empty', hidden: true }, this.emptyText, this.clearBtn);
     this.scroller.append(this.empty);
 
+    // Novo projeto: o formulário fica no topo da lista (rola com ela) e o botão só aparece quando dá para criar.
+    this.newProject = new NewProjectRow(ctx);
+    this.newProjectBtn = h('button', {
+      class: 'ui-link-btn',
+      type: 'button',
+      text: tr('Novo projeto'),
+      on: { click: () => (this.newProject.isOpen ? this.newProject.close() : this.newProject.open()) },
+    });
+    this.scroller.prepend(this.newProject.el);
+
     const close = iconButton(ICONS.close, tr('Fechar painel lateral'), () => ctx.togglePanel('sidebar', false), 'ui-side__close');
     this.el = h(
       'aside',
       { class: 'ui-panel ui-sidebar', attrs: { 'aria-label': tr('Salas e agentes'), id: 'ui-sidebar' } },
-      h('div', { class: 'ui-side__head' }, h('div', { class: 'ui-side__title' }, h('h2', { text: tr('Escritório') }), close), search, this.filters),
+      h('div', { class: 'ui-side__head' }, h('div', { class: 'ui-side__title' }, h('h2', { text: tr('Escritório') }), close), search, this.filters, this.newProjectBtn),
       this.scroller,
     );
   }
@@ -147,6 +162,10 @@ export class Sidebar implements UiComponent {
     const snap = this.ctx.store.snapshot;
     const accounts = snap?.accounts ?? [];
     const hidden = new Set(this.ctx.prefs.hiddenAccounts);
+    // Criar projeto só faz sentido com os recursos disponíveis (projetos e fichas liberados neste acesso).
+    const podeCriar = access().projects === true && access().agents === true;
+    setHidden(this.newProjectBtn, !podeCriar);
+    if (!podeCriar && this.newProject.isOpen) this.newProject.close();
     this.filterList.sync(accounts.length > 1 ? accounts : []);
     setHidden(this.filters, accounts.length <= 1);
 
