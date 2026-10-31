@@ -19,7 +19,7 @@ com a API HTTP (`/api/sessions`, `chat/stream`, `PATCH archived`). Um serviço d
 - Porta principal só no loopback; rotas novas passam pela trava `trusted(req, feature)` de `server/http/app.ts`.
 - A chave do Hermes nunca vai ao cliente nem aos logs.
 - Sem acesso ao `state.db`; só a API HTTP do Hermes.
-- Fork `guimab/habblaud` diverge do original; pode mudar estrutura.
+- Cópia local `/root/habblaud-dev` diverge do original; pode mudar estrutura.
 - Hermes API: `http://192.168.0.31:8642`, `Authorization: Bearer <API_SERVER_KEY>`.
 
 ## Foco de revisão
@@ -43,16 +43,12 @@ com a API HTTP (`/api/sessions`, `chat/stream`, `PATCH archived`). Um serviço d
 
 ---
 
-### Tarefa 0: Fork e base
+### Tarefa 0: Cópia local e base ✅
 
-- [ ] `gh repo fork marmottajr/habblaud --clone=false` (conta guimab); `git remote rename origin upstream`;
-  `git remote add origin https://github.com/guimab/habblaud.git`.
-- [ ] `git checkout -b main-guimab`; commit do patch local (cartões de uso) + spec + este plano:
-  `git commit -m "Base do fork: cartões de uso por env, spec e plano do driver Hermes"`.
-- [ ] `/root/.habblaud-hermes/bin/habblaud-up.sh`: o patch já está commitado — ajustar para não reaplicar
-  (checar `git diff` vazio vira OK). Verificar: `bash -n` e `--so-patch` responde "já aplicado".
-- [ ] `git push -u origin main-guimab`; tornar `main-guimab` a branch padrão do fork.
-- Verificação: `gh repo view guimab/habblaud --json defaultBranchRef` → `main-guimab`.
+- [x] Cópia local em `/root/habblaud-dev` (histórico preservado), branch `main`, remoto só `upstream`
+  (marmottajr/habblaud, consulta). `/root/habblaud` intacto (é de onde sai o container atual).
+- [x] Commit `65599a1`: patch dos cartões de uso + spec + plano. `npm ci` e `npm run typecheck` OK.
+- GitHub e troca do container para esta cópia ficam para depois (decisão do usuário).
 
 ### Tarefa 1: Contrato do driver
 
@@ -151,9 +147,8 @@ export class ConsultService {
 ### Tarefa 7: Subir e verificar de ponta a ponta
 
 - [ ] Usuário põe `HABBLAUD_HERMES_URL` e `HABBLAUD_HERMES_KEY` no `/root/habblaud/.env` (a chave ele mesmo copia).
-- [ ] `/root/.habblaud-hermes/bin/habblaud-up.sh` (rebuild).
+- [ ] Build e subida a partir de `/root/habblaud-dev` (definir na hora: container separado ou trocar o atual).
 - [ ] `curl -s 127.0.0.1:4747/api/consult` → `{"available":true,...}`.
 - [ ] `curl -sN -X POST .../api/consult` e depois `.../messages {"text":"responda só OK"}` → frames `delta` e `done`.
 - [ ] Na interface: abrir consultor pelo botão e pela tecla `c`, perguntar e arquivar.
 - [ ] Pela porta 4748 sem `consult` em `HABBLAUD_REMOTE_ALLOW` → 403; adicionar e repetir → OK.
-- [ ] `git push`.
