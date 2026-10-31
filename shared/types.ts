@@ -359,6 +359,8 @@ export interface OfficeSnapshot {
      * números por não serem do Claude Code nem do Codex (ex.: uma conta alimentada por outro agente). Ausente = ligado.
      */
     usageCards?: boolean;
+    /** Consultor ligado (servidor com HABBLAUD_HERMES_*). Ausente = desligado. */
+    consult?: boolean;
     /**
      * Mensagens pelo escritório ligadas (POST /api/messages): a mesma trava do terminal e HABBLAUD_MENSAGENS sem
      * desligar. Quem recebe agora diz AgentInfo.canMessage. Ausente/false = recurso desligado.

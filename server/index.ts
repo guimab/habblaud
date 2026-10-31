@@ -6,6 +6,9 @@ import http from 'node:http';
 import { join } from 'node:path';
 import { codexDirsRefused, isDefaultDir } from './accounts/detect';
 import { AccountsService } from './accounts/service';
+import { HermesDriver } from './drivers/hermes/client';
+import { createConsultRoutes } from './consult/http';
+import { ConsultService } from './consult/service';
 import { isTruthy, loadConfig, messagesOffReason, terminalOffReason, worldSocketUrl } from './config';
 import { createApiHandler, sendJson } from './http/app';
 import { createRequestGuard, isLoopbackHost } from './http/guard';
@@ -125,6 +128,7 @@ const office = new Office({
   accountName: (id) => accounts.find(id)?.detected.name,
   terminal: config.terminal,
   usageCards: config.usageCards,
+  consult: !!config.hermes,
   permissions: () => late.permissions?.snapshot() ?? new Map(),
   messages: config.messages ? () => late.messages?.reachable() ?? new Set() : undefined,
   ptys: () => (late.ptys ? { status: late.ptys.status(), list: late.ptys.list() } : { status: { enabled: false, reason: late.ptyOff ?? tr('desligado') }, list: [] }),
@@ -339,7 +343,15 @@ const ticker = setInterval(() => {
   }
 }, 250);
 
+// Consultor: sessões rápidas no Hermes pela API HTTP (desligado sem HABBLAUD_HERMES_*).
+const consult = config.hermes ? new ConsultService({ driver: new HermesDriver({ baseUrl: config.hermes.baseUrl, key: config.hermes.key }) }) : undefined;
+if (consult) {
+  setInterval(() => void consult.sweep().catch(() => {}), 60_000).unref();
+  log.info(`   Consultor ligado (Hermes em ${config.hermes!.baseUrl}).`);
+}
+
 const api = createApiHandler({
+  consult: consult ? createConsultRoutes(consult) : undefined,
   renameRoom: (id, name) => {
     const path = office.roomPath(id);
     if (!path) return undefined;

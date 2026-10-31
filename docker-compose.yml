@@ -40,6 +40,9 @@ services:
       # 0: conta sem números de uso não ganha cartão na barra do topo (caso de conta que não é do Claude Code nem do
       # Codex, como a alimentada pelo adaptador do Hermes). Ausente = ligado, como de fábrica.
       HABBLAUD_USAGE_CARDS: ${HABBLAUD_USAGE_CARDS:-}
+      # Consultor (sessões rápidas no Hermes): URL da API do gateway e a chave (API_SERVER_KEY). Sem as duas, desligado.
+      HABBLAUD_HERMES_URL: ${HABBLAUD_HERMES_URL:-}
+      HABBLAUD_HERMES_KEY: ${HABBLAUD_HERMES_KEY:-}
       # 0 desliga as sessões do Codex no escritório.
       HABBLAUD_CODEX: ${HABBLAUD_CODEX:-}
       # 1 liga o Novo agente pelo escritório (no Docker, quem começa a sessão é o auxiliar do host, npm run

@@ -40,6 +40,8 @@ export interface ServerConfig {
    * Cartões de uso por conta na barra do topo (HABBLAUD_USAGE_CARDS=0 desliga; ver OfficeSnapshot.meta.usageCards).
    */
   usageCards: boolean;
+  /** Driver do Hermes para o Consultor (HABBLAUD_HERMES_URL + HABBLAUD_HERMES_KEY); ausente = consultor desligado. */
+  hermes?: HermesConfig;
   /**
    * Mensagens pelo escritório (POST /api/messages e a caixa de entrada do plugin habblaud-mensagens) ligadas: a
    * trava do terminal e HABBLAUD_MENSAGENS sem desligar (ver messagesOffReason).
@@ -226,6 +228,23 @@ export function worldSocketUrl(base: string): string {
   return `${base.replace(/^http/, 'ws').replace(/\/+$/, '')}/v1/socket`;
 }
 
+export interface HermesConfig {
+  baseUrl: string;
+  /** Não enumerável: não sai em JSON.stringify nem em logs do objeto. */
+  readonly key: string;
+}
+
+/** Lê HABBLAUD_HERMES_URL e HABBLAUD_HERMES_KEY; faltando uma, ou URL que não seja http(s), devolve undefined. */
+export function parseHermesConfig(env: NodeJS.ProcessEnv): HermesConfig | undefined {
+  const url = env.HABBLAUD_HERMES_URL?.trim().replace(/\/+$/, '');
+  const key = env.HABBLAUD_HERMES_KEY?.trim();
+  if (!url || !key || !/^https?:\/\//i.test(url)) return undefined;
+  const cfg = { baseUrl: url } as HermesConfig;
+  Object.defineProperty(cfg, 'key', { value: key, enumerable: false });
+  Object.defineProperty(cfg, 'toString', { value: () => `HermesConfig(${url})`, enumerable: false });
+  return cfg;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] = process.argv): ServerConfig {
   const home = env.HOME || homedir();
   const inDocker = detectDocker(env);
@@ -247,6 +266,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     allowedHosts: parseAllowedHosts(env.HABBLAUD_ALLOWED_HOSTS),
     terminal: terminalOffReason(env, host, inDocker) === undefined,
     usageCards: !env.HABBLAUD_USAGE_CARDS?.trim() || isTruthy(env.HABBLAUD_USAGE_CARDS),
+    hermes: parseHermesConfig(env),
     messages: messagesOffReason(env, host, inDocker) === undefined,
     timeline: !env.HABBLAUD_TIMELINE?.trim() || isTruthy(env.HABBLAUD_TIMELINE),
     rootDir,
