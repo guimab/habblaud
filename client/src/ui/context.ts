@@ -38,6 +38,8 @@ export interface UiContext {
   terminals?: TerminalRouter;
   /** Abre a conversa com uma ficha de agente no painel do consultor (definido pela barra do topo). `fresh`: sessão nova. */
   chatCard?(card: { id: string; name: string; fresh?: boolean }): void;
+  /** Abre a conversa de um run (ficha ou consulta) e acompanha/reproduz a resposta (definido pela barra do topo). */
+  openRun?(runId: string, owner: { kind: 'card' | 'consult'; id: string; title?: string }): void;
   readonly world: WorldApi;
   readonly root: HTMLElement;
   readonly prefs: Readonly<UiPrefs>;

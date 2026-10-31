@@ -4,7 +4,8 @@
 // O mesmo painel conversa com uma ficha de agente (openCard: POST /api/cards/:id/messages) e promove a consulta
 // aberta a agente (POST /api/cards {fromConsult}).
 import { tr } from '../../../shared/i18n';
-import { emptyConsult, parseSseChunk, reduceConsult, sendStarted, type ConsultView } from './consult-model';
+import { emptyConsult, parseSseChunk, reduceConsult, resumeStarted, sendStarted, type ApprovalChoice, type ConsultView } from './consult-model';
+import { choiceLabel } from './inbox-model';
 import type { UiContext } from './context';
 import { h, iconButton, setHidden, setText } from './dom';
 import { ICONS } from './icons';
@@ -45,6 +46,8 @@ export class ConsultPanel {
   private readonly promoteBox: HTMLElement;
   private readonly promoteName: HTMLInputElement;
   private readonly promoteProject: HTMLSelectElement;
+  private readonly stopBtn: HTMLButtonElement;
+  private readonly approvalBox: HTMLElement;
   private view: ConsultView = emptyConsult();
   private stream?: AbortController;
 
@@ -80,6 +83,8 @@ export class ConsultPanel {
       f.addEventListener('keyup', (e) => e.stopPropagation());
     }
     this.sendBtn = h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--allow', type: 'button', on: { click: () => void this.send() } }, tr('Enviar'));
+    this.stopBtn = h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--deny', type: 'button', hidden: true, title: tr('Interrompe o agente'), on: { click: () => void this.stopRun() } }, tr('Parar'));
+    this.approvalBox = h('div', { class: 'ui-consult__approval', hidden: true, role: 'group', attrs: { 'aria-label': tr('Aprovação') } });
     const newBtn = h('button', { class: 'ui-btn', type: 'button', on: { click: () => this.reset() } }, tr('Nova consulta'));
     this.archiveBtn = h('button', { class: 'ui-btn', type: 'button', on: { click: () => void this.archive() } }, tr('Arquivar'));
     this.promoteName = h('input', { class: 'ui-rename__input', type: 'text', attrs: { maxlength: 40, placeholder: tr('Nome do agente'), 'aria-label': tr('Nome do agente') } });
@@ -93,7 +98,7 @@ export class ConsultPanel {
       'div',
       { class: 'ui-popover ui-consult', role: 'dialog', tabIndex: -1, attrs: { 'aria-label': tr('Consultor'), id: 'ui-consult', popover: 'manual' } },
       h('div', { class: 'ui-popover__head' }, this.heading, close),
-      h('div', { class: 'ui-set-group ui-consult__body' }, this.contextWrap, this.log, this.status, this.input, this.promoteBox, h('div', { class: 'ui-consult__actions' }, newBtn, this.promoteBtn, this.archiveBtn, this.sendBtn)),
+      h('div', { class: 'ui-set-group ui-consult__body' }, this.contextWrap, this.log, this.status, this.approvalBox, this.input, this.promoteBox, h('div', { class: 'ui-consult__actions' }, newBtn, this.promoteBtn, this.archiveBtn, this.stopBtn, this.sendBtn)),
     );
     this.render();
   }
@@ -126,6 +131,79 @@ export class ConsultPanel {
     this.render();
     if (!this.isOpen) this.toggle(anchor);
     this.input.focus();
+    if (!this.view.busy && !card.fresh) void this.resumeActive(card.id);
+  }
+
+  /** Abre a conversa de um run (Inbox): mostra a resposta guardada e, se ainda roda, acompanha. */
+  openRun(runId: string, owner: { kind: 'card' | 'consult'; id: string; title?: string }, anchor?: HTMLElement): void {
+    this.stream?.abort();
+    this.view = emptyConsult();
+    if (owner.kind === 'card') {
+      this.consultId = undefined;
+      this.card = { id: owner.id, name: owner.title || owner.id };
+    } else {
+      this.card = undefined;
+      this.consultId = owner.id;
+    }
+    this.render();
+    if (!this.isOpen) this.toggle(anchor);
+    void this.attach(runId);
+  }
+
+  /** Ficha com run em andamento (painel fechado no meio): retoma a resposta. */
+  private async resumeActive(cardId: string): Promise<void> {
+    try {
+      const { runs } = await api<{ runs: { runId: string; state: string; owner: { kind: string; id: string } }[] }>('/api/runs');
+      const r = runs.find((x) => x.owner.kind === 'card' && x.owner.id === cardId && (x.state === 'running' || x.state === 'waiting'));
+      if (r && this.card?.id === cardId && !this.view.busy) await this.attach(r.runId);
+    } catch {
+      /* sem runs (driver desligado): nada a retomar */
+    }
+  }
+
+  private async attach(runId: string): Promise<void> {
+    this.view = resumeStarted(this.view, runId);
+    this.render();
+    try {
+      await this.streamAnswer(`/api/runs/${encodeURIComponent(runId)}/events`, { method: 'GET' });
+    } catch (err) {
+      this.apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+    if (this.view.busy && this.view.runId === runId) this.apply({ type: 'done' });
+  }
+
+  private async stopRun(): Promise<void> {
+    const id = this.view.runId;
+    if (!id) return;
+    try {
+      await api(`/api/runs/${encodeURIComponent(id)}/stop`, json({}));
+    } catch (err) {
+      setText(this.status, err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  private async steer(text: string): Promise<void> {
+    const id = this.view.runId;
+    if (!id) return;
+    try {
+      await api(`/api/runs/${encodeURIComponent(id)}/steer`, json({ text }));
+      this.input.value = '';
+      this.ctx.announce(tr('Redirecionado: o agente recebe a orientação no próximo passo.'));
+      setText(this.status, tr('Redirecionado: o agente recebe a orientação no próximo passo.'));
+    } catch (err) {
+      setText(this.status, err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  private async answerApproval(choice: ApprovalChoice): Promise<void> {
+    const id = this.view.runId;
+    if (!id) return;
+    try {
+      await api(`/api/inbox/${encodeURIComponent(`run:${id}`)}`, json({ action: 'approve', choice }));
+      this.apply({ type: 'approved' });
+    } catch (err) {
+      setText(this.status, err instanceof Error ? err.message : String(err));
+    }
   }
 
   private togglePromote(): void {
@@ -174,6 +252,7 @@ export class ConsultPanel {
 
   private async send(): Promise<void> {
     const text = this.input.value.trim();
+    if (text && this.view.busy && this.view.runId) return this.steer(text);
     if (!text || this.view.busy) return;
     this.view = sendStarted(this.view, text);
     this.input.value = '';
@@ -195,11 +274,12 @@ export class ConsultPanel {
     if (this.view.busy) this.apply({ type: 'done' });
   }
 
-  private async streamAnswer(url: string, text: string): Promise<void> {
+  private async streamAnswer(url: string, body: string | RequestInit): Promise<void> {
+    this.stream?.abort();
     this.stream = new AbortController();
     let res: Response;
     try {
-      res = await fetch(url, { ...json({ text }), credentials: 'same-origin', cache: 'no-store', signal: this.stream.signal });
+      res = await fetch(url, { ...(typeof body === 'string' ? json({ text: body }) : body), credentials: 'same-origin', cache: 'no-store', signal: this.stream.signal });
     } catch {
       throw new Error(tr('o Habblaud não respondeu'));
     }
@@ -261,8 +341,25 @@ export class ConsultPanel {
     this.log.scrollTop = this.log.scrollHeight;
     setText(this.status, this.view.error ? tr('Erro: {0}', [this.view.error]) : this.view.tool ? tr('Usando {0}…', [this.view.tool]) : '');
     this.status.classList.toggle('is-error', !!this.view.error);
-    this.sendBtn.disabled = this.view.busy;
-    this.input.disabled = this.view.busy;
+    const running = this.view.busy && !!this.view.runId;
+    setText(this.sendBtn, running ? tr('Redirecionar') : tr('Enviar'));
+    this.sendBtn.title = running ? tr('Manda uma orientação ao agente sem esperar a resposta acabar') : '';
+    this.sendBtn.disabled = this.view.busy && !running;
+    this.input.disabled = this.view.busy && !running;
+    this.input.placeholder = running ? tr('Redirecionar: nova orientação para o agente (Ctrl+Enter)') : tr('Pergunte (Ctrl+Enter envia)');
+    setHidden(this.stopBtn, !running);
+    const a = this.view.approval;
+    setHidden(this.approvalBox, !a);
+    if (a)
+      this.approvalBox.replaceChildren(
+        h('p', { class: 'ui-rename__hint', text: a.description ? tr('Aprovação pedida: {0}', [a.description]) : tr('Aprovação pedida') }),
+        h('pre', { class: 'ui-consult__command', text: a.command }),
+        h(
+          'div',
+          { class: 'ui-consult__actions' },
+          ...a.choices.map((c) => h('button', { class: `ui-btn ui-perm__btn ${c === 'deny' ? 'ui-perm__btn--deny' : 'ui-perm__btn--allow'}`, type: 'button', text: choiceLabel(c), on: { click: () => void this.answerApproval(c) } })),
+        ),
+      );
     this.archiveBtn.disabled = !this.consultId || this.view.busy;
   }
 }

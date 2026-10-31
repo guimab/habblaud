@@ -1,7 +1,18 @@
 // Estado puro do painel do Consultor (ui/consult.ts): conversa, ferramenta em uso, erro, caixa travada.
 
+export type ApprovalChoice = 'once' | 'session' | 'always' | 'deny';
+
+export interface ApprovalView {
+  command: string;
+  description?: string;
+  choices: ApprovalChoice[];
+}
+
 export interface ConsultEvent {
-  type: 'delta' | 'tool' | 'done' | 'error';
+  /** `run`: o turno virou run em segundo plano (redirecionar/parar); `approval`/`approved`: pedido de aprovação. */
+  type: 'delta' | 'tool' | 'done' | 'error' | 'run' | 'approval' | 'approved';
+  runId?: string;
+  approval?: ApprovalView;
   text?: string;
   tool?: string;
   preview?: string;
@@ -18,6 +29,10 @@ export interface ConsultView {
   busy: boolean;
   tool?: string;
   error?: string;
+  /** Run em andamento (some no fim). */
+  runId?: string;
+  /** Aprovação pendente do run. */
+  approval?: ApprovalView;
 }
 
 export function emptyConsult(): ConsultView {
@@ -41,12 +56,20 @@ export function reduceConsult(v: ConsultView, e: ConsultEvent): ConsultView {
     }
     case 'tool':
       return { ...v, tool: e.tool || undefined };
+    case 'run':
+      return e.runId ? { ...v, busy: true, runId: e.runId } : v;
+    case 'approval':
+      return e.approval ? { ...v, approval: e.approval } : v;
+    case 'approved': {
+      const { approval: _a, ...rest } = v;
+      return rest;
+    }
     case 'done': {
-      const { tool: _t, ...rest } = v;
+      const { tool: _t, runId: _r, approval: _a, ...rest } = v;
       return { ...rest, busy: false };
     }
     case 'error': {
-      const { tool: _t, ...rest } = v;
+      const { tool: _t, runId: _r, approval: _a, ...rest } = v;
       return { ...rest, busy: false, error: e.message || 'erro' };
     }
   }
@@ -73,4 +96,9 @@ export function parseSseChunk(rest: string, chunk: string): { events: ConsultEve
     }
   }
   return { events, rest: tail };
+}
+
+/** Retomar um run já em andamento: a conversa ganha a resposta vazia (sem a pergunta, que não temos) e trava a caixa. */
+export function resumeStarted(v: ConsultView, runId: string): ConsultView {
+  return { turns: [...v.turns, { role: 'assistant', text: '' }], busy: true, runId };
 }

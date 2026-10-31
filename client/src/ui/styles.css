@@ -11258,3 +11258,107 @@ html.is-replay #world {
 .ui-card { display: flex; flex-direction: column; gap: 6px; }
 .ui-card__field { display: flex; flex-direction: column; gap: 2px; }
 .ui-card__field > .ui-rename__input, .ui-card__field > .ui-select { width: 100%; box-sizing: border-box; }
+
+/* Inbox (ui/inbox.ts) */
+.ui-btn-inbox {
+  position: relative;
+}
+.ui-inbox__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--muted, #6b7280);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+.ui-inbox__badge.is-urgent {
+  background: #e5484d;
+}
+.ui-inbox {
+  top: calc(var(--top-h) + 8px);
+  right: 8px;
+  width: min(460px, calc(100vw - 16px));
+  max-height: calc(100vh - var(--top-h) - 24px);
+  overflow: auto;
+  display: none;
+}
+.ui-inbox:popover-open,
+.ui-inbox.is-open {
+  display: block;
+}
+.ui-inbox__body,
+.ui-inbox__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ui-inbox__group {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ui-inbox__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.1);
+  border-left: 3px solid transparent;
+}
+.ui-inbox__item--approval,
+.ui-inbox__item--permission,
+.ui-inbox__item--question {
+  border-left-color: #e5a50a;
+}
+.ui-inbox__item--error,
+.ui-inbox__item--interrupted {
+  border-left-color: #e5484d;
+}
+.ui-inbox__meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.ui-inbox__kind,
+.ui-inbox__when {
+  opacity: 0.7;
+}
+.ui-inbox__when {
+  margin-left: auto;
+}
+.ui-inbox__text {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ui-consult__command {
+  margin: 0;
+  padding: 6px;
+  max-height: 120px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+.ui-consult__approval {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-left: 3px solid #e5a50a;
+  background: rgba(229, 165, 10, 0.08);
+}

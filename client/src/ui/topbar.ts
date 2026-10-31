@@ -1,6 +1,7 @@
 // Barra superior: marca, conexão, contadores, uso por conta e botões de controle.
 import { access } from '../net/access';
 import { SpawnPanel } from './spawn';
+import { InboxPanel } from './inbox';
 import { ConsultPanel } from './consult';
 import type { UiComponent, UiContext } from './context';
 import { h, iconButton, setAttr, setHidden, setText, setTitle, setVariant } from './dom';
@@ -53,6 +54,7 @@ export class TopBar implements UiComponent {
   private readonly spawnBtn: HTMLButtonElement;
   private readonly spawnPanel: SpawnPanel;
   private readonly consultPanel: ConsultPanel;
+  private readonly inboxPanel: InboxPanel;
   private readonly consultBtn: HTMLButtonElement;
   /** Grupo dos botões de painéis (feed, Habblaud World, configurações, ajuda); o histórico entra aqui (ui/index.ts). */
   readonly panelGroup: HTMLElement;
@@ -122,6 +124,9 @@ export class TopBar implements UiComponent {
     this.consultPanel = new ConsultPanel(ctx);
     ctx.root.append(this.consultPanel.el);
     ctx.chatCard = (card) => this.consultPanel.openCard(card, this.consultBtn);
+    ctx.openRun = (runId, owner) => this.consultPanel.openRun(runId, owner, this.consultBtn);
+    this.inboxPanel = new InboxPanel(ctx);
+    ctx.root.append(this.inboxPanel.el);
     this.consultBtn = iconButton(ICONS.consult, tr('Consultor: pergunta rápida numa sessão nova do Hermes (C)'), () => this.consultPanel.toggle(this.consultBtn), 'ui-btn-consult');
     this.consultBtn.setAttribute('aria-haspopup', 'dialog');
     this.consultBtn.hidden = true;
@@ -137,6 +142,7 @@ export class TopBar implements UiComponent {
     const panelGroup = h(
       'div',
       { class: 'ui-btn-group', role: 'group', attrs: { 'aria-label': tr('Painéis') } },
+      this.inboxPanel.button,
       this.consultBtn,
       this.spawnBtn,
       this.timelapseBtn,
@@ -173,6 +179,11 @@ export class TopBar implements UiComponent {
   }
 
   /** Botão Mundo (troca de cena), ao lado do Timelapse. */
+  /** Atalho C: abre/fecha o Consultor (só se o servidor ligou). */
+  toggleInbox(): void {
+    this.inboxPanel.toggle();
+  }
+
   /** Atalho C: abre/fecha o Consultor (só se o servidor ligou). */
   toggleConsult(): void {
     if (!this.consultBtn.hidden) this.consultPanel.toggle(this.consultBtn);

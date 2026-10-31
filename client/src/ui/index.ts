@@ -445,6 +445,11 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
         else ctx.announce(tr('Nenhum pedido de permissão ou pergunta para responder agora.'));
         break;
       }
+      case 'i':
+      case 'I':
+        e.preventDefault();
+        topbar.toggleInbox();
+        break;
       case 'c':
       case 'C':
         e.preventDefault();

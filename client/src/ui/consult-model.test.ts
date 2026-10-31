@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyConsult, parseSseChunk, reduceConsult, sendStarted, type ConsultView } from './consult-model';
+import { emptyConsult, parseSseChunk, reduceConsult, resumeStarted, sendStarted, type ConsultView } from './consult-model';
 
 const ask = (v: ConsultView, text: string) => sendStarted(v, text);
 
@@ -21,6 +21,26 @@ describe('reduceConsult', () => {
     expect(v.tool).toBe('terminal');
     v = reduceConsult(v, { type: 'delta', text: 'a' });
     expect(v.tool).toBeUndefined();
+  });
+
+  it('run guarda o id; aprovação aparece e some ao responder; done limpa tudo', () => {
+    let v = reduceConsult(ask(emptyConsult(), 'x'), { type: 'run', runId: 'r1' });
+    expect(v.runId).toBe('r1');
+    v = reduceConsult(v, { type: 'approval', approval: { command: 'rm x', choices: ['once', 'deny'] } });
+    expect(v.approval).toEqual({ command: 'rm x', choices: ['once', 'deny'] });
+    v = reduceConsult(v, { type: 'approved' });
+    expect(v.approval).toBeUndefined();
+    v = reduceConsult(v, { type: 'approval', approval: { command: 'y', choices: ['deny'] } });
+    v = reduceConsult(v, { type: 'done' });
+    expect(v).toMatchObject({ busy: false });
+    expect(v.runId).toBeUndefined();
+    expect(v.approval).toBeUndefined();
+  });
+
+  it('retomar um run: resposta vazia, caixa travada, com o id', () => {
+    const v = resumeStarted(emptyConsult(), 'r9');
+    expect(v).toEqual({ turns: [{ role: 'assistant', text: '' }], busy: true, runId: 'r9' });
+    expect(reduceConsult(v, { type: 'delta', text: 'oi' }).turns).toEqual([{ role: 'assistant', text: 'oi' }]);
   });
 
   it('done libera a caixa', () => {
