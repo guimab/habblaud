@@ -22,6 +22,7 @@ import { AUDIO_BODY_MAX, type DictationService } from '../dictation/dictation';
 import type { DeliveryIndex } from '../deliveries/deliveries';
 import type { FileFetcher } from '../deliveries/fetcher';
 import { HOST_WAIT_MS } from '../host-wait';
+import type { ConsultRoute } from '../consult/http';
 
 export interface ApiDeps {
   office: Office;
@@ -65,6 +66,8 @@ export interface ApiDeps {
   codexLive?: CodexLive;
   /** Novo agente pelo escritório (/api/spawn e, para o auxiliar do host, /api/host/spawn/*; server/spawn/spawn.ts). */
   spawn?: SpawnService;
+  /** Consultor (sessões rápidas via driver). Ausente = desligado. */
+  consult?: ConsultRoute;
   /** Pastas sugeridas no "Novo agente" (GET /api/spawn/folders; spawn/folders.ts): projetos recentes. */
   spawnFolders?: () => Promise<SpawnFolder[]>;
   /** Anexos do "Novo agente" (POST /api/spawn/attachments; spawn/attachments.ts). */
@@ -488,6 +491,14 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         sendJson(res, 403, { error: denied(req, tr('eventos do Codex só são aceitos pelo próprio computador (http://localhost ou http://127.0.0.1)')) });
       } else handleCodexEvent(req, res, { live: deps.codexLive, entries: () => accounts.entriesOf('codex') }).catch((err) => fail(res, err));
       return true;
+    }
+    if (path === '/api/consult' || path.startsWith('/api/consult/')) {
+      if (!deps.consult) {
+        req.resume();
+        sendJson(res, 404, { error: tr('consultor desligado (configure HABBLAUD_HERMES_URL e HABBLAUD_HERMES_KEY)') });
+        return true;
+      }
+      return deps.consult(req, res, path, method, trusted(req, 'consult'));
     }
     if (path === '/api/spawn' || path.startsWith('/api/spawn/')) {
       // Abre uma sessão nova no app do Claude: roda código no computador, então a mesma trava das mensagens.
