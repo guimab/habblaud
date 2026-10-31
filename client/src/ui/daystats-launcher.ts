@@ -5,6 +5,7 @@ import type { UiComponent, UiContext } from './context';
 import type { DayPanel } from './daystats';
 import { iconButton } from './dom';
 import { tr } from '../../../shared/i18n';
+import { offerReload } from './lazy';
 
 /** Colunas de um gráfico em pixels (o mesmo traço dos outros ícones da barra). */
 const DAY_ICON =
@@ -31,7 +32,11 @@ export class DayLauncher implements UiComponent {
     else
       void this.load()
         .then((p) => p.open())
-        .catch(() => this.ctx.announce(tr('Não foi possível abrir o painel Meu dia.')));
+        .catch((err) => {
+          if (offerReload(err)) return;
+          this.ctx.announce(tr('Não foi possível abrir o painel Meu dia.'));
+          window.alert(tr('Não foi possível abrir o painel Meu dia.'));
+        });
   }
 
   render(): void {

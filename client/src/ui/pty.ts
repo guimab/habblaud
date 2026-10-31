@@ -5,6 +5,7 @@
 // entre os agentes do mesmo projeto; as duas janelas se revezam no mesmo lugar.
 // As teclas não vazam para os atalhos do escritório (T, P, M, Esc...): Esc, por exemplo, interrompe o Claude.
 // Fechar a janela não encerra a sessão; "Encerrar" encerra.
+import { offerReload } from './lazy';
 import type { AgentInfo, PtyInfo } from '../../../shared/types';
 import type { UiComponent, UiContext } from './context';
 import { h, iconButton, setHidden, setText } from './dom';
@@ -232,6 +233,11 @@ export class PtyPanel implements UiComponent, PtyControl {
       this.pane = new PtyPane(() => this.ctx.invalidate());
       this.screen.append(this.pane.el);
       return this.pane;
+    });
+    // Falhou (atualização ou rede): oferece recarregar, e a próxima tentativa baixa de novo.
+    this.loading.catch((err) => {
+      this.loading = null;
+      offerReload(err);
     });
     return this.loading;
   }

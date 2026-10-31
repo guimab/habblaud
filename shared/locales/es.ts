@@ -1856,6 +1856,7 @@ export const ES: Readonly<Record<string, string>> = {
   "o run já terminou": "el run ya terminó",
   "resposta do Hermes sem corpo": "respuesta de Hermes sin cuerpo",
   "run desconhecido": "run desconocido",
+  "O Habblaud foi atualizado e esta página ficou desatualizada. Recarregar agora?": "Habblaud se actualizó y esta página quedó desactualizada. ¿Recargar ahora?",
   "Não consegui gravar {0}: {1}": "No pude guardar {0}: {1}",
 
   // server/permissions/codex.ts
