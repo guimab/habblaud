@@ -11147,3 +11147,61 @@ html.is-replay #world {
 .ui-world-chip__visitors[hidden] {
   display: none;
 }
+
+/* Consultor (ui/consult.ts): painel à direita, abaixo da barra do topo. */
+.ui-consult {
+  top: calc(var(--top-h) + 8px);
+  right: 8px;
+  width: min(440px, calc(100vw - 16px));
+  display: none;
+}
+.ui-consult:popover-open,
+.ui-consult.is-open {
+  display: block;
+}
+.ui-consult__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ui-consult__check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.ui-consult__log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.ui-consult__log:empty {
+  display: none;
+}
+.ui-consult__turn {
+  padding: 6px 8px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.ui-consult__turn--user {
+  align-self: flex-end;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  white-space: pre-wrap;
+}
+.ui-consult__turn--assistant {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+.ui-consult__status.is-error {
+  color: #e5534b;
+}
+.ui-consult__status:empty {
+  display: none;
+}
+.ui-consult__actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
