@@ -211,7 +211,9 @@ describe('HABBLAUD_WORLD e HABBLAUD_WORLD_URL', () => {
 
   it('parseWorldConfig: só https/wss; http://127.0.0.1 no modo de desenvolvimento; só a origem', () => {
     const p = (url: string | undefined, extra: NodeJS.ProcessEnv = {}, argv: string[] = []) =>
-      parseWorldConfig({ HABBLAUD_WORLD_URL: url, ...extra }, argv);
+      parseWorldConfig({ HABBLAUD_WORLD: '1', HABBLAUD_WORLD_URL: url, ...extra }, argv);
+    // No fork o World vem desligado: só liga com HABBLAUD_WORLD=1.
+    expect(parseWorldConfig({}, [])).toEqual({ enabled: false, dev: false });
     // Sem HABBLAUD_WORLD_URL (ou vazia), o servidor do mundo padrão; definida, vale a definida (e recusada não cai no padrão).
     expect(p(undefined)).toEqual({ enabled: true, dev: false, url: DEFAULT_WORLD_URL, defaultUrl: true });
     expect(p('  ')).toEqual({ enabled: true, dev: false, url: DEFAULT_WORLD_URL, defaultUrl: true });

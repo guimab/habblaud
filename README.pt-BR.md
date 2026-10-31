@@ -1,3 +1,7 @@
+> **Fork local divergente** de marmottajr/habblaud: virou a central de agentes do Hermes (fichas, Inbox, agendas).
+> Não recebe nem publica releases; a verificação de versão nova e o Habblaud World ficam desligados. As instruções
+> abaixo que citam o GitHub original são do projeto de origem.
+
 <p align="center">
   <img src="client/public/assets/brand/logo-mark@4x.png" width="96" alt="Logo do Habblaud: um pequeno prédio em pixel art" />
 </p>
@@ -336,9 +340,6 @@ npm run docker:up        # tira o container codetown e copia os dados do volume 
 - **Navegador:** preferências e moedinhas passam para as chaves novas na primeira vez que a página abre.
 - **Variáveis:** as `CODETOWN_*` não valem mais; renomeie para `HABBLAUD_*` no `.env` (ex.: `HABBLAUD_BIND`). O
   servidor e o `docker:up` avisam quando acham uma antiga.
-- **Repositório:** agora é `github.com/marmottajr/habblaud` (o GitHub redireciona o endereço antigo). Para acertar o
-  clone: `git remote set-url origin https://github.com/marmottajr/habblaud.git`. A pasta local pode continuar com o
-  nome antigo.
 - Backups do `settings.json` feitos antes da troca continuam com o nome `settings.json.codetown-backup-<data>`.
 
 ### Desinstalar

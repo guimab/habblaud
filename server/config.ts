@@ -178,8 +178,8 @@ export function messagesOffReason(env: NodeJS.ProcessEnv, host: string, inDocker
 }
 
 /**
- * O servidor do Habblaud World quando HABBLAUD_WORLD_URL está ausente ou vazia: o World vem ligado por padrão, mas nada
- * sai do computador antes de a pessoa criar a conta e entrar (server/world/service.ts). HABBLAUD_WORLD=0 desliga tudo.
+ * O servidor do Habblaud World quando HABBLAUD_WORLD_URL está ausente ou vazia. No fork o World vem DESLIGADO (serviço
+ * do projeto original): só liga com HABBLAUD_WORLD=1; mesmo ligado, nada sai antes de criar a conta e entrar.
  */
 export const DEFAULT_WORLD_URL = 'https://server.habblaud.com';
 
@@ -195,7 +195,7 @@ const LOCAL_WORLD_HOSTS: readonly string[] = ['127.0.0.1', 'host.docker.internal
  */
 export function parseWorldConfig(env: NodeJS.ProcessEnv, argv: string[]): WorldConfig {
   const flag = env.HABBLAUD_WORLD?.trim();
-  const enabled = !flag || isTruthy(flag);
+  const enabled = !!flag && isTruthy(flag);
   const dev = argv.includes('--dev') || isTruthy(env.HABBLAUD_WORLD_DEV);
   if (!enabled) return { enabled, dev };
   const raw = env.HABBLAUD_WORLD_URL?.trim();

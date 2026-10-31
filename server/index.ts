@@ -586,14 +586,14 @@ server.listen(config.port, config.host, () => {
       codexBin
         ? tr('   Mensagens ao Codex: pelo codex queue ({0}).', [codexBin])
         : config.inDocker
-          ? tr('   Mensagens ao Codex: pelo auxiliar do host (deixe npm run codex:bridge rodando no Mac).')
+          ? tr('   Mensagens ao Codex: pelo auxiliar do host (deixe npm run codex:bridge rodando no host).')
           : tr('   Mensagens ao Codex: sem o binário do Codex (codex no PATH ou HABBLAUD_CODEX_BIN); o auxiliar npm run codex:bridge também serve.'),
     );
   }
   if (config.world.warning) log.warn(`   ${config.world.warning}.`);
   log.info(
     !world
-      ? tr('   Habblaud World: escondido (HABBLAUD_WORLD=0).')
+      ? tr('   Habblaud World: desligado (ligue com HABBLAUD_WORLD=1).')
       : !config.world.url
         ? tr('   Habblaud World: desligado (HABBLAUD_WORLD_URL recusada).')
         : tr('   Habblaud World: {0}, conta neste computador: {1}{2}.', [

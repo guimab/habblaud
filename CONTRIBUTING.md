@@ -4,7 +4,7 @@ Obrigado por querer contribuir com o Habblaud! Relatos de bugs, ideias e melhori
 
 ## Antes de começar
 
-- Para bugs e ideias, procure nas [issues](https://github.com/marmottajr/habblaud/issues) se o assunto já foi registrado.
+- Este é um fork local divergente de marmottajr/habblaud: não recebe nem publica releases, e as issues do original não valem aqui.
 - Para mudanças maiores ou que alterem o comportamento do Habblaud, abra uma issue para conversar sobre a proposta antes de implementar.
 - Prefira mudanças pequenas e focadas. Se a alteração muda o que aparece ou acontece no escritório, descreva esse comportamento no pull request.
 
