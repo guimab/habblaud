@@ -3510,4 +3510,13 @@ export const FR: Readonly<Record<string, string>> = {
   "sessão inválida": "session invalide",
   "Sessão solta.": "Session libérée.",
   "Soltar sessão": "Libérer la session",
+  "id de job inválido": "identifiant de job invalide",
+  "Hermes fora do ar": "Hermes est hors ligne",
+  "resposta do Hermes inválida": "réponse de Hermes invalide",
+  "job não encontrado": "job introuvable",
+  "este Hermes não tem a API de jobs": "ce Hermes n'a pas d'API de jobs",
+  "Hermes respondeu {0}: {1}": "Hermes a répondu {0} : {1}",
+  "nome obrigatório": "le nom est obligatoire",
+  "regra obrigatória": "la règle est obligatoire",
+  "nada para alterar": "rien à modifier",
 };

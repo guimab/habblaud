@@ -3494,4 +3494,13 @@ export const ES: Readonly<Record<string, string>> = {
   "sessão inválida": "sesión no válida",
   "Sessão solta.": "Sesión soltada.",
   "Soltar sessão": "Soltar sesión",
+  "id de job inválido": "id de job no válido",
+  "Hermes fora do ar": "Hermes está fuera de línea",
+  "resposta do Hermes inválida": "respuesta de Hermes no válida",
+  "job não encontrado": "job no encontrado",
+  "este Hermes não tem a API de jobs": "este Hermes no tiene la API de jobs",
+  "Hermes respondeu {0}: {1}": "Hermes respondió {0}: {1}",
+  "nome obrigatório": "el nombre es obligatorio",
+  "regra obrigatória": "la regla es obligatoria",
+  "nada para alterar": "nada que cambiar",
 };
