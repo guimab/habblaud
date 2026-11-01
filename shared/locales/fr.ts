@@ -3519,4 +3519,5 @@ export const FR: Readonly<Record<string, string>> = {
   "nome obrigatório": "le nom est obligatoire",
   "regra obrigatória": "la règle est obligatoire",
   "nada para alterar": "rien à modifier",
+  "Hermes não configurado (HABBLAUD_HERMES_URL e HABBLAUD_HERMES_KEY)": "Hermes non configuré (HABBLAUD_HERMES_URL et HABBLAUD_HERMES_KEY)",
 };

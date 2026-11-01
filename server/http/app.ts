@@ -78,6 +78,8 @@ export interface ApiDeps {
   inbox?: CardRoute;
   /** Agendas das fichas (/api/schedules); mudanças pedem a feature `agents`. */
   schedules?: CardRoute;
+  /** Rotinas globais (/api/routines): agendas do Habblaud + cronjobs do Hermes; mudanças pedem a feature `agents`. */
+  routines?: CardRoute;
   /** Pastas sugeridas no "Novo agente" (GET /api/spawn/folders; spawn/folders.ts): projetos recentes. */
   spawnFolders?: () => Promise<SpawnFolder[]>;
   /** Anexos do "Novo agente" (POST /api/spawn/attachments; spawn/attachments.ts). */
@@ -507,6 +509,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
       return true;
     }
     if (deps.cards && (path === '/api/cards' || path.startsWith('/api/cards/'))) return deps.cards(req, res, path, method, trusted(req, 'agents'));
+    if (deps.routines && (path === '/api/routines' || path.startsWith('/api/routines/'))) return deps.routines(req, res, path, method, trusted(req, 'agents'));
     if (path === '/api/schedules' || path.startsWith('/api/schedules/')) {
       if (deps.schedules) return deps.schedules(req, res, path, method, trusted(req, 'agents'));
       req.resume();

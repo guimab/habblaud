@@ -3,6 +3,7 @@
 //   npm run dev    -> tsx server/index.ts --dev (Vite em middleware mode, HMR no mesmo servidor)
 //   npm start      -> node dist/server/index.js (serve dist/client)
 import { createScheduleRoutes } from './schedule/http';
+import { createRoutineRoutes } from './schedule/routines';
 import { Scheduler } from './schedule/scheduler';
 import http from 'node:http';
 import { join } from 'node:path';
@@ -12,6 +13,7 @@ import { RunManager } from './runs/manager';
 import { Inbox } from './inbox/inbox';
 import { createInboxRoutes } from './inbox/http';
 import { HermesDriver } from './drivers/hermes/client';
+import { HermesJobs } from './drivers/hermes/jobs';
 import { createConsultRoutes } from './consult/http';
 import { ConsultService } from './consult/service';
 import { isTruthy, loadConfig, messagesOffReason, terminalOffReason, worldSocketUrl } from './config';
@@ -405,6 +407,8 @@ const api = createApiHandler({
   projects: createProjectRoutes(projects),
   ...(runs && inbox ? { inbox: createInboxRoutes({ inbox, runs }) } : {}),
   ...(scheduler ? { schedules: createScheduleRoutes(scheduler) } : {}),
+  // Rotinas globais: sempre ligadas; origem ausente aparece como desligada, não some.
+  routines: createRoutineRoutes({ ...(scheduler ? { scheduler } : {}), ...(config.hermes ? { jobs: new HermesJobs({ baseUrl: config.hermes.baseUrl, key: config.hermes.key }) } : {}) }),
   cards: createCardRoutes({ cards: agentCards, ...(cardService ? { service: cardService } : {}), ...(consult ? { consult } : {}) }),
   renameRoom: (id, name) => {
     if (id.startsWith('project:')) {

@@ -3502,4 +3502,5 @@ export const EN: Readonly<Record<string, string>> = {
   "nome obrigatório": "name is required",
   "regra obrigatória": "schedule is required",
   "nada para alterar": "nothing to change",
+  "Hermes não configurado (HABBLAUD_HERMES_URL e HABBLAUD_HERMES_KEY)": "Hermes not configured (HABBLAUD_HERMES_URL and HABBLAUD_HERMES_KEY)",
 };
