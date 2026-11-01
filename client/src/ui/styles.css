@@ -11275,6 +11275,15 @@ html.is-replay #world {
 .ui-consult.is-open {
   display: block;
 }
+.ui-consult--embedded {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  max-height: none;
+  margin: 0;
+}
+.ui-consult--embedded[hidden] { display: none; }
+.ui-consult--embedded .ui-consult__actions { flex-wrap: wrap; }
 .ui-consult__body {
   display: flex;
   flex-direction: column;

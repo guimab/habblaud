@@ -13,6 +13,11 @@ import { access } from '../net/access';
 import { renderMarkdown } from './markdown';
 
 const TEXT_MAX = 20_000;
+let embeddedSequence = 0;
+
+export interface ConsultPanelOptions {
+  embedded?: boolean;
+}
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -50,24 +55,26 @@ export class ConsultPanel {
   private readonly approvalBox: HTMLElement;
   private view: ConsultView = emptyConsult();
   private stream?: AbortController;
+  private viewEpoch = 0;
 
-  constructor(private readonly ctx: UiContext) {
+  constructor(private readonly ctx: UiContext, private readonly options: ConsultPanelOptions = {}) {
+    const id = options.embedded ? `ui-agent-consult-${++embeddedSequence}` : 'ui-consult';
     this.context = h('textarea', {
       class: 'ui-rename__input ui-consult__context',
-      attrs: { id: 'ui-consult-context', rows: 3, maxlength: TEXT_MAX, placeholder: tr('Contexto (opcional): quem você é, o que está fazendo, o que importa') },
+      attrs: { id: `${id}-context`, rows: 3, maxlength: TEXT_MAX, placeholder: tr('Contexto (opcional): quem você é, o que está fazendo, o que importa') },
     });
-    this.screen = h('input', { type: 'checkbox', attrs: { id: 'ui-consult-screen' } });
+    this.screen = h('input', { type: 'checkbox', attrs: { id: `${id}-screen` } });
     this.contextWrap = h(
       'div',
       { class: 'ui-consult__setup' },
       this.context,
-      h('label', { class: 'ui-consult__check', attrs: { for: 'ui-consult-screen' } }, this.screen, h('span', { text: tr('Incluir o que estou vendo (agente ou sala selecionados)') })),
+      h('label', { class: 'ui-consult__check', attrs: { for: `${id}-screen` } }, this.screen, h('span', { text: tr('Incluir o que estou vendo (agente ou sala selecionados)') })),
     );
     this.log = h('div', { class: 'ui-consult__log', attrs: { 'aria-live': 'polite' } });
     this.status = h('p', { class: 'ui-rename__hint ui-consult__status', attrs: { role: 'status' } });
     this.input = h('textarea', {
       class: 'ui-rename__input ui-consult__input',
-      attrs: { id: 'ui-consult-input', rows: 3, maxlength: TEXT_MAX, placeholder: tr('Pergunte (Ctrl+Enter envia)') },
+      attrs: { id: `${id}-input`, rows: 3, maxlength: TEXT_MAX, placeholder: tr('Pergunte (Ctrl+Enter envia)') },
     });
     for (const f of [this.context, this.input]) {
       f.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -96,14 +103,16 @@ export class ConsultPanel {
     const close = iconButton(ICONS.close, tr('Fechar'), () => this.hide(), 'ui-icon-btn--sm');
     this.el = h(
       'div',
-      { class: 'ui-popover ui-consult', role: 'dialog', tabIndex: -1, attrs: { 'aria-label': tr('Consultor'), id: 'ui-consult', popover: 'manual' } },
+      { class: options.embedded ? 'ui-consult ui-consult--embedded' : 'ui-popover ui-consult', role: options.embedded ? 'region' : 'dialog', hidden: options.embedded, tabIndex: -1, attrs: { 'aria-label': tr('Consultor'), id, popover: options.embedded ? undefined : 'manual' } },
       h('div', { class: 'ui-popover__head' }, this.heading, close),
       h('div', { class: 'ui-set-group ui-consult__body' }, this.contextWrap, this.log, this.status, this.approvalBox, this.input, this.promoteBox, h('div', { class: 'ui-consult__actions' }, newBtn, this.promoteBtn, this.archiveBtn, this.stopBtn, this.sendBtn)),
     );
+    this.el.inert = !!options.embedded;
     this.render();
   }
 
   get isOpen(): boolean {
+    if (this.options.embedded) return !this.el.hidden;
     try {
       return this.el.matches(':popover-open');
     } catch {
@@ -114,9 +123,17 @@ export class ConsultPanel {
   toggle(anchor?: HTMLElement): void {
     if (anchor) this.anchor = anchor;
     if (this.isOpen) return this.hide();
-    if (typeof this.el.showPopover === 'function') this.el.showPopover();
+    if (this.options.embedded) { setHidden(this.el, false); this.el.inert = false; this.el.classList.add('is-open'); }
+    else if (typeof this.el.showPopover === 'function') this.el.showPopover();
     else this.el.classList.add('is-open');
     this.anchor?.setAttribute('aria-expanded', 'true');
+    if (this.view.runId && !this.stream) {
+      const id = this.view.runId;
+      // O SSE reproduz a resposta atual: substitui a cauda parcial, preservando pedidos e turnos anteriores.
+      const turns = this.view.turns;
+      this.view = { ...this.view, turns: turns.at(-1)?.role === 'assistant' ? turns.slice(0, -1) : turns };
+      void this.attach(id);
+    }
     (this.consultId || this.card ? this.input : this.context).focus();
   }
 
@@ -152,24 +169,27 @@ export class ConsultPanel {
 
   /** Ficha com run em andamento (painel fechado no meio): retoma a resposta. */
   private async resumeActive(cardId: string): Promise<void> {
+    const epoch = this.viewEpoch;
     try {
       const { runs } = await api<{ runs: { runId: string; state: string; owner: { kind: string; id: string } }[] }>('/api/runs');
       const r = runs.find((x) => x.owner.kind === 'card' && x.owner.id === cardId && (x.state === 'running' || x.state === 'waiting'));
-      if (r && this.card?.id === cardId && !this.view.busy) await this.attach(r.runId);
+      if (r && epoch === this.viewEpoch && this.isOpen && this.card?.id === cardId && !this.view.busy) await this.attach(r.runId);
     } catch {
       /* sem runs (driver desligado): nada a retomar */
     }
   }
 
   private async attach(runId: string): Promise<void> {
+    const epoch = this.viewEpoch;
     this.view = resumeStarted(this.view, runId);
     this.render();
     try {
       await this.streamAnswer(`/api/runs/${encodeURIComponent(runId)}/events`, { method: 'GET' });
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return;
+      if (epoch !== this.viewEpoch || (err as Error)?.name === 'AbortError') return;
       this.apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
+    if (epoch !== this.viewEpoch) return;
     if (this.view.busy && this.view.runId === runId) this.apply({ type: 'done' });
   }
 
@@ -232,8 +252,19 @@ export class ConsultPanel {
     }
   }
 
+  /** Encerra somente a observação local; não pede Parar nem conclui o run do executor. */
+  disposeView(): void {
+    this.viewEpoch++;
+    this.stream?.abort();
+    this.stream = undefined;
+    this.view = { ...this.view, busy: false };
+    this.render();
+  }
+
   hide(): void {
-    if (typeof this.el.hidePopover === 'function' && this.isOpen) this.el.hidePopover();
+    this.disposeView();
+    if (this.options.embedded) { setHidden(this.el, true); this.el.inert = true; }
+    else if (typeof this.el.hidePopover === 'function' && this.isOpen) this.el.hidePopover();
     this.el.classList.remove('is-open');
     this.anchor?.setAttribute('aria-expanded', 'false');
   }
@@ -255,53 +286,81 @@ export class ConsultPanel {
     const text = this.input.value.trim();
     if (text && this.view.busy && this.view.runId) return this.steer(text);
     if (!text || this.view.busy) return;
+    const epoch = this.viewEpoch;
     this.view = sendStarted(this.view, text);
     this.input.value = '';
     this.render();
     try {
       if (this.card) {
         await this.streamAnswer(`/api/cards/${encodeURIComponent(this.card.id)}/messages`, text);
-        if (this.view.busy) this.apply({ type: 'done' });
+        if (epoch === this.viewEpoch && this.view.busy) this.apply({ type: 'done' });
         return;
       }
       if (!this.consultId) {
         const c = await api<{ id: string }>('/api/consult', json({ context: this.context.value.trim() || undefined, screen: this.screen.checked ? this.describeScreen() || undefined : undefined }));
+        if (epoch !== this.viewEpoch) return;
         this.consultId = c.id;
       }
       await this.streamAnswer(`/api/consult/${encodeURIComponent(this.consultId)}/messages`, text);
     } catch (err) {
       // Conversa trocada/limpa no meio da resposta: o erro do abort não é desta conversa.
-      if ((err as Error)?.name === 'AbortError') return;
+      if (epoch !== this.viewEpoch || (err as Error)?.name === 'AbortError') return;
       this.apply({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-    if (this.view.busy) this.apply({ type: 'done' });
+    if (epoch === this.viewEpoch && this.view.busy) this.apply({ type: 'done' });
   }
 
   private async streamAnswer(url: string, body: string | RequestInit): Promise<void> {
     this.stream?.abort();
-    this.stream = new AbortController();
+    const epoch = this.viewEpoch;
+    const controller = new AbortController();
+    this.stream = controller;
+    const ensureCurrent = (): void => {
+      if (epoch !== this.viewEpoch || controller.signal.aborted) throw new DOMException('Stream cancelado', 'AbortError');
+    };
     let res: Response;
     try {
-      res = await fetch(url, { ...(typeof body === 'string' ? json({ text: body }) : body), credentials: 'same-origin', cache: 'no-store', signal: this.stream.signal });
+      res = await fetch(url, { ...(typeof body === 'string' ? json({ text: body }) : body), credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') throw err;
+      ensureCurrent();
       throw new Error(tr('o Habblaud não respondeu'));
     }
+    ensureCurrent();
     if (!res.ok || !res.body) {
-      const b = (await res.json().catch(() => ({}))) as { error?: string };
+      const b = (await res.json().catch((err: unknown) => {
+        if ((err as Error)?.name === 'AbortError') throw err;
+        return {};
+      })) as { error?: string };
+      ensureCurrent();
       throw new Error(b.error ?? tr('erro {0}', [res.status]));
     }
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
     let rest = '';
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const r = parseSseChunk(rest, value);
-      rest = r.rest;
-      for (const e of r.events) this.apply(e);
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        ensureCurrent();
+        if (done) break;
+        const r = parseSseChunk(rest, value);
+        rest = r.rest;
+        for (const e of r.events) {
+          ensureCurrent();
+          this.apply(e);
+        }
+      }
+      // Último evento sem a linha em branco final.
+      if (rest.trim()) for (const e of parseSseChunk(rest, '\n\n').events) {
+        ensureCurrent();
+        this.apply(e);
+      }
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') throw err;
+      ensureCurrent();
+      throw err;
+    } finally {
+      reader.releaseLock();
     }
-    // Último evento sem a linha em branco final.
-    if (rest.trim()) for (const e of parseSseChunk(rest, '\n\n').events) this.apply(e);
   }
 
   private apply(e: Parameters<typeof reduceConsult>[1]): void {
