@@ -11499,3 +11499,58 @@ html.is-replay #world {
 .ui-sched__days { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
 .ui-sched__day { display: inline-flex; gap: 2px; align-items: center; }
 .ui-sched__num { width: 5em; }
+
+/* Agendas (rotinas globais): mais larga que a Inbox, origem marcada em cada linha. */
+.ui-routines {
+  width: min(620px, calc(100vw - 16px));
+}
+.ui-routines__item--paused,
+.ui-routines__item--done {
+  opacity: 0.8;
+}
+.ui-routines__item--error {
+  border-left-color: #e5484d;
+}
+.ui-routines__item--running {
+  border-left-color: #3e9b4f;
+}
+.ui-routines__source {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: rgba(127, 127, 127, 0.25);
+}
+.ui-routines__source--hermes {
+  background: rgba(94, 106, 210, 0.35);
+}
+.ui-routines__notice {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: rgba(229, 165, 10, 0.15);
+}
+.ui-routines__notice--error {
+  background: rgba(229, 72, 77, 0.18);
+}
+.ui-routines__confirm {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ui-routines__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ui-routines__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.ui-routines__check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}

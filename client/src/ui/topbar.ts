@@ -2,6 +2,7 @@
 import { access } from '../net/access';
 import { SpawnPanel } from './spawn';
 import { InboxPanel } from './inbox';
+import { RoutinesPanel } from './routines';
 import { ConsultPanel } from './consult';
 import type { UiComponent, UiContext } from './context';
 import { h, iconButton, setAttr, setHidden, setText, setTitle, setVariant } from './dom';
@@ -58,6 +59,7 @@ export class TopBar implements UiComponent {
   private readonly spawnPanel: SpawnPanel;
   private readonly consultPanel: ConsultPanel;
   private readonly inboxPanel: InboxPanel;
+  private readonly routinesPanel: RoutinesPanel;
   private readonly consultBtn: HTMLButtonElement;
   /** Grupo dos botões de painéis (feed, Habblaud World, configurações, ajuda); o histórico entra aqui (ui/index.ts). */
   readonly panelGroup: HTMLElement;
@@ -129,6 +131,8 @@ export class TopBar implements UiComponent {
     // Agent navigation is owned by createUI/Drawer, never by the transient Advisor.
     this.inboxPanel = new InboxPanel(ctx);
     ctx.root.append(this.inboxPanel.el);
+    this.routinesPanel = new RoutinesPanel(ctx);
+    ctx.root.append(this.routinesPanel.el);
     this.consultBtn = iconButton(ICONS.consult, tr('Consultor: pergunta rápida numa sessão nova do Hermes (C)'), () => this.consultPanel.toggle(this.consultBtn), 'ui-btn-consult');
     this.consultBtn.setAttribute('aria-haspopup', 'dialog');
     this.consultBtn.hidden = true;
@@ -145,6 +149,7 @@ export class TopBar implements UiComponent {
       'div',
       { class: 'ui-btn-group', role: 'group', attrs: { 'aria-label': tr('Painéis') } },
       this.inboxPanel.button,
+      this.routinesPanel.button,
       this.consultBtn,
       this.spawnBtn,
       this.timelapseBtn,
