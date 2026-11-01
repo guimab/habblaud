@@ -99,3 +99,31 @@ A entrega de Agendas precisa validar CRUD em job de teste isolado e resolver o d
 - Fork local: server/runs/manager.ts:13–38,88,106,318–324; server/inbox/http.ts:17–20,80–99; server/schedule/scheduler.ts:14–24.
 - Docs oficiais consultadas: https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server e https://hermes-agent.nousresearch.com/docs/developer-guide/cron-internals .
 - Sonda temporária sanitizada: /root/.hermes/cache/scratch/probe-panel-sources.py; agregado: /root/.hermes/cache/scratch/panel-sources-summary.json. Não versionados; nenhum payload privado persistido.
+
+## Sonda de escrita em /api/jobs (2026-11-01, entrega Agendas, tarefa 1)
+
+Job de teste isolado (`habblaud-sonda-agendas`, deliver=local, prompt trivial), criado pausado e apagado ao fim;
+contagem de jobs antes = depois = 1, sem sobra. Script: scratch `probe-jobs-write.py` (não versionado, sem segredo).
+
+| Passo | HTTP | Observado |
+| --- | --- | --- |
+| POST /api/jobs {paused:true, paused_reason} | 200 | `enabled=false`, `state=paused`, `next_run_at=null`; `every 24h` normalizado para `interval` 1440 min (`every 1440m`); `origin` preenchido com platform/IP/user-agent do chamador |
+| GET /api/jobs (sem include_disabled) | 200 | job pausado **não aparece**; com `include_disabled=true` aparece |
+| PATCH {name, prompt} | 200 | devolve o job inteiro atualizado; demais campos preservados |
+| PATCH {schedule:"0 9 * * 1"} | 200 | vira `kind=cron`, `expr`; continua pausado |
+| PATCH só com campos fora da whitelist (model, timezone) | 400 | `No valid fields to update` |
+| PATCH {schedule inválido} | **500** | mensagem útil com formatos aceitos (intervalo, `in 30m`, `every monday 9am`, cron, timestamp) — erro de validação sai como 500, não 400 |
+| POST /resume | 200 | `enabled=true`, `state=scheduled`, `next_run_at` calculado em -03:00 (cron interpretado no fuso local do servidor Hermes) |
+| POST /pause | 200 | `paused_reason` volta a null; `next_run_at` mantido |
+| POST /run em job **pausado** | 200 | **reativa o job**: `enabled=true`, `state=scheduled`, `next_run_at`=agora; ganha `manual_run_at`/`manual_run_prompt` |
+| após ~50 s | — | `last_status=ok`, `repeat.completed=1`, `latest_execution.status=completed` com claimed/started/finished, `delivery_outcome=suppressed` (deliver local); `canonical_completions` = [id da execução]; `next_run_at` volta ao próximo cron e o job **continua ativo** |
+| GET /api/jobs/{id} | 200 | sem `latest_execution` (só a lista agrega) |
+| DELETE | 200 `{ok:true}`; GET depois 404; DELETE de novo 404 | |
+
+Consequências para a interface:
+- "Executar agora" em rotina Hermes pausada **a deixa ativa**. A tela precisa avisar antes ou repausar explicitamente
+  depois (decisão de produto; não esconder o efeito).
+- Erro de regra inválida chega como 500 com texto; mostrar o texto do Hermes ao lado do campo, não "erro do servidor".
+- Fuso: horários vêm com offset do servidor Hermes (-03:00 aqui); não há campo de fuso por job.
+- `include_disabled=true` é obrigatório para listar pausadas.
+- Resultado: texto da saída do cron não vem por HTTP; só status/erro/entrega da última execução.
