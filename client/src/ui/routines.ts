@@ -181,7 +181,8 @@ export class RoutinesPanel {
       const run = (keepPaused: boolean) => void this.act(tr('Executar agora'), () => api(this.hermesPath(r.id, '/run'), send('POST', { keepPaused })));
       return h('div', { class: 'ui-consult__actions ui-routines__confirm', role: 'group' }, h('span', { text: c.text }), this.btn(c.keepPausedLabel, () => run(true)), this.btn(c.reactivateLabel, () => run(false)), cancel);
     }
-    const paused = r.status.kind === 'paused' || r.status.kind === 'done';
+    // Pausar/retomar segue o estado real (um job pausado pode estar rodando agora).
+    const paused = r.source === 'hermes' ? !this.hermesJob(r.key)?.enabled : r.status.kind === 'paused' || r.status.kind === 'done';
     const out: HTMLElement[] = [];
     if (r.source === 'hermes') {
       out.push(this.btn(tr('Editar'), () => this.setMode({ key: r.key, kind: 'edit' })));

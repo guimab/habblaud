@@ -159,9 +159,15 @@ export function createRoutineRoutes(deps: RoutineRouteDeps): CardRoute {
       return true;
     }
     run(async () => {
-      const raw = req.headers['content-length'] === '0' ? {} : await readJson(req).catch(() => ({}));
-      const keep = !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).keepPaused === true;
-      const before = keep ? await jobs.get(id) : undefined;
+      // Corpo inválido falha fechado (400/413): engolir o erro executaria e reativaria um job pausado sem querer.
+      const hasBody = req.headers['content-length'] !== undefined ? req.headers['content-length'] !== '0' : req.headers['transfer-encoding'] !== undefined;
+      const raw = hasBody ? await readJson(req) : (req.resume(), {});
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, tr('esperado um objeto JSON'));
+      const keep = (raw as Record<string, unknown>).keepPaused === true;
+      // `latest_execution` só vem na lista (sondado): o "antes" precisa sair dela, senão a execução anterior
+      // contaria como "começou" e a pausa cancelaria o disparo.
+      const before = keep ? (await jobs.list()).find((j) => j.id === id) : undefined;
+      if (keep && !before) throw new JobsError('not_found', tr('job não encontrado'), 404);
       const job = await jobs.run(id);
       // Executar um job pausado o reativa no Hermes (sondado); "manter pausada" repausa depois que a execução começa.
       const repause = !!before && !before.enabled;

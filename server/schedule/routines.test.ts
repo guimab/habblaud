@@ -159,14 +159,15 @@ describe('rotas /api/routines', () => {
   });
 
   it('executar e manter pausada: só repausa depois que a execução começou', async () => {
-    const before = job({ enabled: false, state: 'paused', latest: { status: 'completed', startedAt: 'T0' } });
     let lists = 0;
     const jobs = fakeJobs({
-      get: async () => before,
+      // Como o Hermes real: get não traz latest_execution; só a lista traz.
+      get: async () => job({ enabled: false, state: 'paused' }),
       list: async () => {
         lists++;
-        // 1ª volta: ainda não começou; 2ª: nova execução iniciada.
-        return [lists < 2 ? job({ latest: { status: 'completed', startedAt: 'T0' } }) : job({ latest: { status: 'running', startedAt: 'T1' } })];
+        // 1ª: o "antes" (pausado, execução antiga T0); 2ª: disparado mas não começou; 3ª: nova execução iniciada.
+        if (lists === 1) return [job({ enabled: false, state: 'paused', latest: { status: 'completed', startedAt: 'T0' } })];
+        return [lists < 3 ? job({ latest: { status: 'completed', startedAt: 'T0' } }) : job({ latest: { status: 'running', startedAt: 'T1' } })];
       },
     });
     const { call } = await setup({ jobs });
@@ -174,12 +175,12 @@ describe('rotas /api/routines', () => {
     expect(r.status).toBe(202);
     expect(r.body).toMatchObject({ triggered: true, keepPaused: 'pending' });
     await vi.waitFor(() => expect(jobs.calls.at(-1)).toBe('pause "j1"'));
-    expect(lists).toBe(2);
+    expect(lists).toBe(3);
     expect(jobs.calls.filter((c) => c.startsWith('pause'))).toHaveLength(1);
   });
 
   it('manter pausada em job já ativo não pausa nada', async () => {
-    const jobs = fakeJobs({ get: async () => job() });
+    const jobs = fakeJobs({ list: async () => [job()] });
     const { call } = await setup({ jobs });
     const r = await call('POST', '/api/routines/hermes/j1/run', { keepPaused: true });
     expect(r.body).toMatchObject({ keepPaused: false });
@@ -188,7 +189,8 @@ describe('rotas /api/routines', () => {
   });
 
   it('manter pausada: se a execução não começa no prazo, não pausa (para não cancelar o disparo)', async () => {
-    const jobs = fakeJobs({ get: async () => job({ enabled: false, state: 'paused' }), list: async () => [job()] });
+    let n = 0;
+    const jobs = fakeJobs({ list: async () => [++n === 1 ? job({ enabled: false, state: 'paused' }) : job()] });
     const sleep = vi.fn(async () => {});
     const { call } = await setup({ jobs, sleep, watchMs: 30 });
     await call('POST', '/api/routines/hermes/j1/run', { keepPaused: true });
@@ -200,13 +202,30 @@ describe('rotas /api/routines', () => {
   it('manter pausada: se a pessoa mexeu no job durante a espera (ficou pausado de novo), não pausa outra vez', async () => {
     let lists = 0;
     const jobs = fakeJobs({
-      get: async () => job({ enabled: false, state: 'paused' }),
-      list: async () => (++lists < 2 ? [job()] : [job({ enabled: false, state: 'paused', latest: { status: 'running', startedAt: 'T1' } })]),
+      list: async () => (++lists === 1 ? [job({ enabled: false, state: 'paused' })] : lists < 3 ? [job()] : [job({ enabled: false, state: 'paused', latest: { status: 'running', startedAt: 'T1' } })]),
     });
     const { call } = await setup({ jobs });
     await call('POST', '/api/routines/hermes/j1/run', { keepPaused: true });
-    await vi.waitFor(() => expect(lists).toBe(2));
+    await vi.waitFor(() => expect(lists).toBe(3));
     await new Promise((x) => setTimeout(x, 20));
     expect(jobs.calls.some((c) => c.startsWith('pause'))).toBe(false);
+  });
+
+  it('executar: corpo JSON inválido falha fechado e nada é disparado', async () => {
+    const jobs = fakeJobs();
+    const { call } = await setup({ jobs });
+    const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
+    const r = await fetch(`${base}/api/routines/hermes/j1/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{keepPaused:' });
+    expect(r.status).toBe(400);
+    expect((await call('POST', '/api/routines/hermes/j1/run', [])).status).toBe(400);
+    expect(jobs.calls).toEqual([]);
+  });
+
+  it('executar sem corpo: disparo simples', async () => {
+    const jobs = fakeJobs();
+    await setup({ jobs });
+    const base = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
+    expect((await fetch(`${base}/api/routines/hermes/j1/run`, { method: 'POST' })).status).toBe(202);
+    expect(jobs.calls).toEqual(['run "j1"']);
   });
 });
