@@ -195,6 +195,14 @@ profile's current session as a background run, and the reply lands in the Inbox 
   the profile) and delivers outside the Inbox.
 - Deleting the profile deletes its schedules.
 
+The **clock** button in the top bar opens **Schedules** for the whole office: every profile schedule and every Hermes
+cron job (including paused ones) in one list, each tagged with its source and managed there — nothing is copied or
+migrated. Hermes jobs can be created (paused by default), edited (only changed fields are sent; model, provider,
+workdir and script stay read-only), paused, resumed, run now and deleted; profile schedules are paused, resumed, run
+or deleted here and edited on the profile. Running a paused Hermes job asks first: **run and keep paused** waits for
+the run to start, then pauses again (if it does not start within 90 s the job stays active, since pausing would cancel
+it). If Hermes is off or unreachable the screen says so instead of showing an empty list.
+
 ## Advisor
 
 The **Advisor** (`C`) opens a quick question in a **new Hermes session**, with optional free context ("who you are,
@@ -1087,6 +1095,7 @@ mod/      o mod do Habblaud e os plugins de permissões e de mensagens (plugins 
 | `POST /api/runs/:id/steer` and `/stop` | Redirect (new guidance) and stop a run in progress. |
 | `GET\|POST /api/consult`, `POST /api/consult/:id/messages`, `DELETE /api/consult/:id` | Advisor: opens a session, follows the reply as a stream, archives the conversation. Requires `consult` on the phone port. |
 | `GET\|POST /api/schedules`, `PATCH\|DELETE /api/schedules/:id`, `POST /api/schedules/:id/run` | Schedules of a profile. Changes require `agents`. |
+| `GET /api/routines`, `POST /api/routines/hermes`, `GET\|PATCH\|DELETE /api/routines/hermes/:id`, `POST /api/routines/hermes/:id/{pause,resume,run}` | All routines (profile schedules + Hermes cron jobs); writes go only to Hermes jobs. Changes require `agents`. |
 | `GET /api/access` | What this access can do: local or remote, and which features (permissions, messages, terminal, spawn, projects, agents). |
 
 More server details in [`server/README.md`](server/README.md).

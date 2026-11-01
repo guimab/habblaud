@@ -10,6 +10,14 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Novidades
+
+- **Agendas globais:** botão de relógio na barra do topo lista todas as agendas de ficha e todos os cronjobs do Hermes
+  (inclusive pausados), cada um administrado na origem — nada é duplicado. Jobs do Hermes: criar (pausado por padrão),
+  editar só o que mudou, pausar, retomar, executar agora e excluir com confirmação. Executar um job pausado pergunta
+  antes e oferece **executar e manter pausada**, que repausa só depois que a execução começa. Hermes fora do ar vira
+  aviso, nunca lista vazia. Nova rota `/api/routines` (escrita exige `agents`; chave, IP e origem não vão ao navegador).
+
 ### Documentação
 
 - **Painel de trabalho documentado nos dois READMEs:** abas Trabalho/Histórico/Configuração, conversa de ficha e run

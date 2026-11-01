@@ -192,6 +192,15 @@ da ficha como run em segundo plano, e a resposta cai na Inbox com ⏰.
   da ficha) e entrega fora da Inbox.
 - Apagar a ficha apaga as agendas dela.
 
+O botão de **relógio** na barra do topo abre as **Agendas** do escritório inteiro: todas as agendas de ficha e todos os
+cronjobs do Hermes (inclusive os pausados) numa lista, cada um marcado com a origem e administrado lá — nada é copiado
+nem migrado. Jobs do Hermes podem ser criados (pausados por padrão), editados (só os campos alterados são enviados;
+modelo, provedor, workdir e script ficam só leitura), pausados, retomados, executados agora e excluídos; agendas de
+ficha são pausadas, retomadas, executadas ou excluídas aqui e editadas na ficha. Executar um job pausado do Hermes
+pergunta antes: **executar e manter pausada** espera a execução começar e então pausa de novo (se não começar em 90 s o
+job fica ativo, porque pausar cancelaria o disparo). Com o Hermes desligado ou fora do ar, a tela diz isso em vez de
+mostrar lista vazia.
+
 ## Consultor
 
 O **Consultor** (`C`) abre uma pergunta rápida numa **sessão nova do Hermes**, com contexto livre opcional ("quem você
@@ -1079,6 +1088,7 @@ mod/      o mod do Habblaud e os plugins de permissões e de mensagens (plugins 
 | `POST /api/runs/:id/steer` e `/stop` | Redirecionar (nova orientação) e parar um run em andamento. |
 | `GET\|POST /api/consult`, `POST /api/consult/:id/messages`, `DELETE /api/consult/:id` | Consultor: abre sessão, acompanha a resposta em stream e arquiva a conversa. Exige `consult` no celular. |
 | `GET\|POST /api/schedules`, `PATCH\|DELETE /api/schedules/:id`, `POST /api/schedules/:id/run` | Agendas de uma ficha. Mudanças exigem `agents`. |
+| `GET /api/routines`, `POST /api/routines/hermes`, `GET\|PATCH\|DELETE /api/routines/hermes/:id`, `POST /api/routines/hermes/:id/{pause,resume,run}` | Todas as rotinas (agendas de ficha + cronjobs do Hermes); a escrita vai só aos jobs do Hermes. Mudanças exigem `agents`. |
 | `GET /api/access` | O que este acesso pode fazer: local ou remoto, e quais features (permissions, messages, terminal, spawn, projects, agents). |
 
 Mais detalhes do servidor em [`server/README.md`](server/README.md).
