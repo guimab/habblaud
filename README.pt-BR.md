@@ -151,6 +151,18 @@ pertencem a ela**. A ficha existe sem nada rodando — sem sessão viva ela apar
 - **Promover a agente…:** transforma uma consulta do Consultor numa ficha num projeto.
 - Alterar fichas exige a feature `agents` na porta do celular (`HABBLAUD_REMOTE_ALLOW`).
 
+O painel lateral mantém o escritório visível, tem largura ajustável e abre em **Trabalho**:
+
+- **Trabalho:** conversa embutida, pedido e estado do run selecionado. Ficha dormindo ou sem run abre o compositor,
+  sem executar um turno automaticamente. Sessão externa sem ficha mostra atividade, sem inventar um chat de ficha.
+- **Histórico:** conversas registradas do agente; abrir uma delas leva ao mesmo run em Trabalho, sem começar outro.
+- **Configuração:** ficha e editor do personagem. Trocar de aba no mesmo alvo preserva o rascunho; mudar de alvo não
+  reaproveita mensagens ou respostas do anterior.
+
+Conversar com a ficha e abrir um run pela Inbox usam esse mesmo painel, não o popover do Consultor. Fechar o painel
+ou sair de Trabalho encerra apenas a observação local, sem enviar **Parar**. A resposta segue no executor. Registros
+antigos podem não ter o pedido, e os dados disponíveis pela API não garantem um histórico completo.
+
 ## Inbox e runs em segundo plano
 
 Todo turno começado pelo escritório é um **run** (`runs.json`): segue sem ninguém assistindo, é retomado de onde parou
@@ -185,6 +197,7 @@ da ficha como run em segundo plano, e a resposta cai na Inbox com ⏰.
 O **Consultor** (`C`) abre uma pergunta rápida numa **sessão nova do Hermes**, com contexto livre opcional ("quem você
 é, o que está fazendo, o que importa") e uma caixa para incluir o que você está vendo (agente ou sala selecionados).
 Ele arquiva sozinho depois de 30 minutos ocioso, e pode ser promovido a ficha num projeto (**Promover a agente…**).
+Nesta entrega, o Consultor avulso continua como popover separado; as conversas de fichas e runs usam o painel lateral.
 
 ## Como é
 

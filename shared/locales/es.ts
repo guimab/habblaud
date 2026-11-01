@@ -215,6 +215,11 @@ export const ES: Readonly<Record<string, string>> = {
   "Não foi possível copiar": "No se pudo copiar",
   // client/src/ui/drawer.ts e ui/inbox.ts (conversas del agente y el pedido que originó la respuesta)
   "Conversas": "Conversaciones",
+  "Trabalho": "Trabajo",
+  "Histórico": "Historial",
+  "Configuração": "Configuración",
+  "Registro de execução indisponível.": "Registro de ejecución no disponible.",
+  "Conversa": "Conversación",
   "Nenhuma conversa registrada ainda.": "Todavía no hay conversaciones registradas.",
   "Registro antigo: o pedido não foi gravado.": "Registro antiguo: el pedido no se guardó.",
   "Você pediu: {0}": "Pediste: {0}",

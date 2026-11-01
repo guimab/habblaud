@@ -25,6 +25,7 @@ export class ScheduleSection {
   private readonly msg: HTMLElement;
   private readonly tz: HTMLElement;
   private cardId = '';
+  private loadGeneration = 0;
 
   constructor() {
     this.list = h('div', { class: 'ui-sched__list' });
@@ -60,14 +61,26 @@ export class ScheduleSection {
     this.showKind();
   }
 
+  /** Descarta somente a ficha local e GETs antigos; operações remotas continuam. */
+  invalidate(): void {
+    this.loadGeneration++;
+    this.cardId = '';
+    this.list.replaceChildren();
+    this.text.value = '';
+    setText(this.tz, '');
+    this.say('');
+  }
+
   async load(cardId: string): Promise<void> {
+    const generation = ++this.loadGeneration;
     this.cardId = cardId;
     try {
       const r = await cardCall<{ schedules: ScheduleDto[]; timeZone?: string }>('GET', `/api/schedules?card=${encodeURIComponent(cardId)}`);
-      if (cardId !== this.cardId) return;
+      if (generation !== this.loadGeneration) return;
       this.renderList(r.schedules);
       setText(this.tz, r.timeZone ? tr('Horários no fuso do servidor ({0}). A resposta chega na Inbox.', [r.timeZone]) : '');
     } catch (err) {
+      if (generation !== this.loadGeneration) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
@@ -108,17 +121,24 @@ export class ScheduleSection {
   }
 
   private async act(method: string, path: string, body: unknown, ok = ''): Promise<void> {
+    const generation = this.loadGeneration;
+    const cardId = this.cardId;
     try {
       const r = await cardCall<ScheduleDto>(method, `/api/schedules/${path.split('/').map(encodeURIComponent).join('/')}`, body);
+      if (generation !== this.loadGeneration || cardId !== this.cardId) return;
       if (r?.last?.result === 'busy') this.say(tr('Agente ocupado agora; tente depois.'), true);
       else this.say(ok);
     } catch (err) {
+      if (generation !== this.loadGeneration || cardId !== this.cardId) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
-    await this.load(this.cardId);
+    if (generation !== this.loadGeneration || cardId !== this.cardId) return;
+    await this.load(cardId);
   }
 
   private async create(): Promise<void> {
+    const generation = this.loadGeneration;
+    const cardId = this.cardId;
     try {
       const rule = ruleFromForm({
         kind: this.kind.value,
@@ -128,11 +148,13 @@ export class ScheduleSection {
         days: this.days.filter((c) => c.checked).map((c) => Number(c.value)),
         time: this.time.value,
       });
-      await cardCall('POST', '/api/schedules', { cardId: this.cardId, text: this.text.value, rule });
+      await cardCall('POST', '/api/schedules', { cardId, text: this.text.value, rule });
+      if (generation !== this.loadGeneration || cardId !== this.cardId) return;
       this.text.value = '';
       this.say(tr('Agenda criada.'));
-      await this.load(this.cardId);
+      await this.load(cardId);
     } catch (err) {
+      if (generation !== this.loadGeneration || cardId !== this.cardId) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }

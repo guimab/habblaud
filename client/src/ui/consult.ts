@@ -11,12 +11,18 @@ import { h, iconButton, setHidden, setText } from './dom';
 import { ICONS } from './icons';
 import { access } from '../net/access';
 import { renderMarkdown } from './markdown';
+import { panelRun } from './agent-panel-routing-model';
+import { preferredRun } from './agent-panel-model';
+import type { RunView } from '../../../shared/types';
 
 const TEXT_MAX = 20_000;
 let embeddedSequence = 0;
 
 export interface ConsultPanelOptions {
   embedded?: boolean;
+  readRun?: boolean;
+  onRun?: (run: Pick<RunView, 'runId' | 'state' | 'prompt'> | null) => void;
+  onClose?: () => void;
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -46,6 +52,9 @@ export class ConsultPanel {
   private anchor?: HTMLElement;
   private consultId?: string;
   private card?: { id: string; name: string };
+  private discoverCard = true;
+  /** Identidade histórica explícita; não é permissão para ações de run ativo. */
+  private explicitRunId?: string;
   private readonly heading: HTMLElement;
   private readonly promoteBtn: HTMLButtonElement;
   private readonly promoteBox: HTMLElement;
@@ -56,6 +65,8 @@ export class ConsultPanel {
   private view: ConsultView = emptyConsult();
   private stream?: AbortController;
   private viewEpoch = 0;
+  private discovery?: AbortController;
+  private observedRun?: Pick<RunView, 'runId' | 'state' | 'prompt'>;
 
   constructor(private readonly ctx: UiContext, private readonly options: ConsultPanelOptions = {}) {
     const id = options.embedded ? `ui-agent-consult-${++embeddedSequence}` : 'ui-consult';
@@ -84,7 +95,8 @@ export class ConsultPanel {
           void this.send();
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          this.hide();
+          if (this.options.onClose) this.options.onClose();
+          else this.hide();
         }
       });
       f.addEventListener('keyup', (e) => e.stopPropagation());
@@ -92,7 +104,7 @@ export class ConsultPanel {
     this.sendBtn = h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--allow', type: 'button', on: { click: () => void this.send() } }, tr('Enviar'));
     this.stopBtn = h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--deny', type: 'button', hidden: true, title: tr('Interrompe o agente'), on: { click: () => void this.stopRun() } }, tr('Parar'));
     this.approvalBox = h('div', { class: 'ui-consult__approval', hidden: true, role: 'group', attrs: { 'aria-label': tr('Aprovação') } });
-    const newBtn = h('button', { class: 'ui-btn', type: 'button', on: { click: () => this.reset() } }, tr('Nova consulta'));
+    const newBtn = h('button', { class: 'ui-btn', type: 'button', hidden: options.readRun, on: { click: () => this.reset() } }, tr('Nova consulta'));
     this.archiveBtn = h('button', { class: 'ui-btn', type: 'button', on: { click: () => void this.archive() } }, tr('Arquivar'));
     this.promoteName = h('input', { class: 'ui-rename__input', type: 'text', attrs: { maxlength: 40, placeholder: tr('Nome do agente'), 'aria-label': tr('Nome do agente') } });
     this.promoteName.addEventListener('keydown', (e) => e.stopPropagation());
@@ -100,7 +112,7 @@ export class ConsultPanel {
     this.promoteBox = h('div', { class: 'ui-project__row', hidden: true }, this.promoteName, this.promoteProject, h('button', { class: 'ui-btn', type: 'button', text: tr('Criar agente'), on: { click: () => void this.promote() } }));
     this.promoteBtn = h('button', { class: 'ui-btn', type: 'button', title: tr('A consulta vira um agente com ficha (nome, projeto, instruções)'), on: { click: () => this.togglePromote() } }, tr('Promover a agente…'));
     this.heading = h('h2', { text: tr('Consultor') });
-    const close = iconButton(ICONS.close, tr('Fechar'), () => this.hide(), 'ui-icon-btn--sm');
+    const close = iconButton(ICONS.close, tr('Fechar'), () => this.options.onClose ? this.options.onClose() : this.hide(), 'ui-icon-btn--sm');
     this.el = h(
       'div',
       { class: options.embedded ? 'ui-consult ui-consult--embedded' : 'ui-popover ui-consult', role: options.embedded ? 'region' : 'dialog', hidden: options.embedded, tabIndex: -1, attrs: { 'aria-label': tr('Consultor'), id, popover: options.embedded ? undefined : 'manual' } },
@@ -123,38 +135,58 @@ export class ConsultPanel {
   toggle(anchor?: HTMLElement): void {
     if (anchor) this.anchor = anchor;
     if (this.isOpen) return this.hide();
+    this.show(anchor);
+  }
+
+  /** Retoma apenas a observação, inclusive ao voltar de outra aba. */
+  show(anchor?: HTMLElement): void {
+    if (anchor) this.anchor = anchor;
     if (this.options.embedded) { setHidden(this.el, false); this.el.inert = false; this.el.classList.add('is-open'); }
     else if (typeof this.el.showPopover === 'function') this.el.showPopover();
     else this.el.classList.add('is-open');
     this.anchor?.setAttribute('aria-expanded', 'true');
-    if (this.view.runId && !this.stream) {
-      const id = this.view.runId;
+    // Discovery/record GET is already an observation, even before SSE exists.
+    const id = this.explicitRunId ?? this.view.runId;
+    if (id && !this.stream && !this.discovery) {
       // O SSE reproduz a resposta atual: substitui a cauda parcial, preservando pedidos e turnos anteriores.
       const turns = this.view.turns;
       this.view = { ...this.view, turns: turns.at(-1)?.role === 'assistant' ? turns.slice(0, -1) : turns };
       void this.attach(id);
+    } else if (this.card && this.discoverCard && !this.explicitRunId && !this.view.runId && !this.view.busy && !this.stream && !this.discovery) {
+      void this.resumeActive(this.card.id);
     }
     (this.consultId || this.card ? this.input : this.context).focus();
   }
 
   /** Conversa com a ficha (troca de alvo limpa a conversa na tela; `fresh` também). */
-  openCard(card: { id: string; name: string; fresh?: boolean }, anchor?: HTMLElement): void {
-    if (card.fresh || this.card?.id !== card.id) {
-      this.stream?.abort();
+  openCard(card: { id: string; name: string; fresh?: boolean; refresh?: boolean }, anchor?: HTMLElement): void {
+    if (card.fresh || card.refresh || this.card?.id !== card.id) {
+      this.disposeView();
+      if (card.fresh || this.card?.id !== card.id) this.input.value = '';
+      setHidden(this.promoteBox, true);
       this.view = emptyConsult();
+      this.explicitRunId = undefined;
+      this.observedRun = undefined;
+      this.options.onRun?.(null);
     }
     this.consultId = undefined;
     this.card = { id: card.id, name: card.name };
+    this.discoverCard = !card.fresh;
     this.render();
     if (!this.isOpen) this.toggle(anchor);
     this.input.focus();
-    if (!this.view.busy && !card.fresh) void this.resumeActive(card.id);
+    if (!this.explicitRunId && !this.view.busy && !this.view.runId && !this.discovery && !this.stream && !card.fresh) void this.resumeActive(card.id);
   }
 
   /** Abre a conversa de um run (Inbox): mostra a resposta guardada e, se ainda roda, acompanha. */
   openRun(runId: string, owner: { kind: 'card' | 'consult'; id: string; title?: string }, anchor?: HTMLElement): void {
-    this.stream?.abort();
+    this.disposeView();
+    this.input.value = '';
+    setHidden(this.promoteBox, true);
     this.view = emptyConsult();
+    this.observedRun = undefined;
+    this.explicitRunId = runId;
+    this.discoverCard = false;
     if (owner.kind === 'card') {
       this.consultId = undefined;
       this.card = { id: owner.id, name: owner.title || owner.id };
@@ -164,16 +196,20 @@ export class ConsultPanel {
     }
     this.render();
     if (!this.isOpen) this.toggle(anchor);
-    void this.attach(runId);
+    else void this.attach(runId);
   }
 
   /** Ficha com run em andamento (painel fechado no meio): retoma a resposta. */
   private async resumeActive(cardId: string): Promise<void> {
     const epoch = this.viewEpoch;
+    this.discovery?.abort();
+    const controller = this.discovery = new AbortController();
     try {
-      const { runs } = await api<{ runs: { runId: string; state: string; owner: { kind: string; id: string } }[] }>('/api/runs');
-      const r = runs.find((x) => x.owner.kind === 'card' && x.owner.id === cardId && (x.state === 'running' || x.state === 'waiting'));
-      if (r && epoch === this.viewEpoch && this.isOpen && this.card?.id === cardId && !this.view.busy) await this.attach(r.runId);
+      const { runs } = await api<{ runs: { runId: string; state: string; owner: { kind: string; id: string } }[] }>('/api/runs', { signal: controller.signal });
+      const r = this.options.readRun
+        ? preferredRun(runs.map(panelRun).filter((x): x is RunView => !!x && x.owner.kind === 'card' && x.owner.id === cardId))
+        : runs.find(x => x.owner.kind === 'card' && x.owner.id === cardId && (x.state === 'running' || x.state === 'waiting'));
+      if (r && !controller.signal.aborted && epoch === this.viewEpoch && this.isOpen && this.card?.id === cardId && !this.view.busy) await this.attach(r.runId);
     } catch {
       /* sem runs (driver desligado): nada a retomar */
     }
@@ -181,9 +217,25 @@ export class ConsultPanel {
 
   private async attach(runId: string): Promise<void> {
     const epoch = this.viewEpoch;
-    this.view = resumeStarted(this.view, runId);
-    this.render();
     try {
+      if (this.options.readRun) {
+        this.discovery?.abort();
+        const controller = this.discovery = new AbortController();
+        const run = panelRun(await api(`/api/runs/${encodeURIComponent(runId)}`, { signal: controller.signal }));
+        if (epoch !== this.viewEpoch || controller.signal.aborted || !this.isOpen) return;
+        if (!run || run.runId !== runId) throw new Error(tr('Registro de execução indisponível.'));
+        this.observedRun = run;
+        this.options.onRun?.(run);
+        this.view = { turns: run.prompt ? [{ role: 'user', text: run.prompt }] : [], busy: false };
+        if (run.state !== 'running' && run.state !== 'waiting') {
+          if (run.text) this.view.turns.push({ role: 'assistant', text: run.text });
+          if (run.error) this.view.error = run.error;
+          this.render();
+          return;
+        }
+      }
+      this.view = resumeStarted(this.view, runId);
+      this.render();
       await this.streamAnswer(`/api/runs/${encodeURIComponent(runId)}/events`, { method: 'GET' });
     } catch (err) {
       if (epoch !== this.viewEpoch || (err as Error)?.name === 'AbortError') return;
@@ -196,9 +248,11 @@ export class ConsultPanel {
   private async stopRun(): Promise<void> {
     const id = this.view.runId;
     if (!id) return;
+    const epoch = this.viewEpoch;
     try {
       await api(`/api/runs/${encodeURIComponent(id)}/stop`, json({}));
     } catch (err) {
+      if (epoch !== this.viewEpoch) return;
       setText(this.status, err instanceof Error ? err.message : String(err));
     }
   }
@@ -206,12 +260,15 @@ export class ConsultPanel {
   private async steer(text: string): Promise<void> {
     const id = this.view.runId;
     if (!id) return;
+    const epoch = this.viewEpoch;
     try {
       await api(`/api/runs/${encodeURIComponent(id)}/steer`, json({ text }));
+      if (epoch !== this.viewEpoch || id !== this.view.runId) return;
       this.input.value = '';
       this.ctx.announce(tr('Redirecionado: o agente recebe a orientação no próximo passo.'));
       setText(this.status, tr('Redirecionado: o agente recebe a orientação no próximo passo.'));
     } catch (err) {
+      if (epoch !== this.viewEpoch) return;
       setText(this.status, err instanceof Error ? err.message : String(err));
     }
   }
@@ -219,10 +276,13 @@ export class ConsultPanel {
   private async answerApproval(choice: ApprovalChoice): Promise<void> {
     const id = this.view.runId;
     if (!id) return;
+    const epoch = this.viewEpoch;
     try {
       await api(`/api/inbox/${encodeURIComponent(`run:${id}`)}`, json({ action: 'approve', choice }));
+      if (epoch !== this.viewEpoch || id !== this.view.runId) return;
       this.apply({ type: 'approved' });
     } catch (err) {
+      if (epoch !== this.viewEpoch) return;
       setText(this.status, err instanceof Error ? err.message : String(err));
     }
   }
@@ -239,15 +299,19 @@ export class ConsultPanel {
   private async promote(): Promise<void> {
     const name = this.promoteName.value.trim();
     if (!name || !this.consultId) return;
+    const epoch = this.viewEpoch;
+    const id = this.consultId;
     try {
       const projectId = this.promoteProject.value;
-      const c = await api<{ id: string; name: string }>('/api/cards', json({ name, fromConsult: this.consultId, ...(projectId ? { projectId } : {}) }));
+      const c = await api<{ id: string; name: string }>('/api/cards', json({ name, fromConsult: id, ...(projectId ? { projectId } : {}) }));
+      if (epoch !== this.viewEpoch || id !== this.consultId) return;
       this.consultId = undefined;
       this.card = { id: c.id, name: c.name };
       this.promoteName.value = '';
       setHidden(this.promoteBox, true);
       this.render();
     } catch (err) {
+      if (epoch !== this.viewEpoch) return;
       setText(this.status, err instanceof Error ? err.message : String(err));
     }
   }
@@ -255,9 +319,24 @@ export class ConsultPanel {
   /** Encerra somente a observação local; não pede Parar nem conclui o run do executor. */
   disposeView(): void {
     this.viewEpoch++;
+    this.discovery?.abort();
+    this.discovery = undefined;
     this.stream?.abort();
     this.stream = undefined;
     this.view = { ...this.view, busy: false };
+    this.render();
+  }
+
+  /** Nenhuma conversa é atribuída à sessão externa; limpa só a observação local. */
+  clearTarget(): void {
+    this.hide();
+    this.card = undefined;
+    this.consultId = undefined;
+    this.explicitRunId = undefined;
+    this.observedRun = undefined;
+    this.view = emptyConsult();
+    this.input.value = '';
+    this.options.onRun?.(null);
     this.render();
   }
 
@@ -286,7 +365,11 @@ export class ConsultPanel {
     const text = this.input.value.trim();
     if (text && this.view.busy && this.view.runId) return this.steer(text);
     if (!text || this.view.busy) return;
+    // Novo envio solta toda observação anterior, automática ou explícita, não o executor.
+    this.disposeView();
     const epoch = this.viewEpoch;
+    this.explicitRunId = undefined;
+    this.observedRun = undefined;
     this.view = sendStarted(this.view, text);
     this.input.value = '';
     this.render();
@@ -364,14 +447,40 @@ export class ConsultPanel {
   }
 
   private apply(e: Parameters<typeof reduceConsult>[1]): void {
+    if (e.type === 'run' && e.runId) {
+      const prompt = this.view.turns.findLast(turn => turn.role === 'user')?.text;
+      this.observedRun = { runId: e.runId, state: 'running', ...(prompt !== undefined ? { prompt } : {}) };
+    } else if (this.observedRun) {
+      if (e.type === 'approval') this.observedRun = { ...this.observedRun, state: 'waiting' };
+      else if (e.type === 'approved') this.observedRun = { ...this.observedRun, state: 'running' };
+    }
+    if (this.observedRun) this.options.onRun?.(this.observedRun);
     this.view = reduceConsult(this.view, e);
     this.render();
+    if (this.options.readRun && this.observedRun && (e.type === 'done' || e.type === 'error')) void this.refreshRun(this.observedRun.runId);
+  }
+
+  /** A cauda do SSE não distingue todos os desfechos; o registro é a autoridade. */
+  private async refreshRun(runId: string): Promise<void> {
+    const epoch = this.viewEpoch;
+    this.discovery?.abort();
+    const controller = this.discovery = new AbortController();
+    try {
+      const run = panelRun(await api(`/api/runs/${encodeURIComponent(runId)}`, { signal: controller.signal }));
+      if (controller.signal.aborted || epoch !== this.viewEpoch || !this.isOpen || this.observedRun?.runId !== runId || run?.runId !== runId) return;
+      this.observedRun = run;
+      this.options.onRun?.(run);
+    } catch { /* sem registro atualizado: não inventa um desfecho */ }
   }
 
   private reset(): void {
-    this.stream?.abort();
+    this.disposeView();
+    this.input.value = '';
     this.consultId = undefined;
-    this.card = undefined;
+    if (!this.options.readRun) this.card = undefined;
+    this.explicitRunId = undefined;
+    this.observedRun = undefined;
+    this.options.onRun?.(null);
     setHidden(this.promoteBox, true);
     this.view = emptyConsult();
     this.context.value = '';
@@ -382,10 +491,13 @@ export class ConsultPanel {
   private async archive(): Promise<void> {
     const id = this.consultId;
     if (!id) return this.reset();
+    const epoch = this.viewEpoch;
     try {
       await api(`/api/consult/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (epoch !== this.viewEpoch || id !== this.consultId) return;
       this.reset();
     } catch (err) {
+      if (epoch !== this.viewEpoch) return;
       setText(this.status, err instanceof Error ? err.message : String(err));
     }
   }

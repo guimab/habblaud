@@ -176,10 +176,10 @@ export class OfficeStore {
   }
 
   /** Conversas dos agentes (GET /api/runs): turnos já rodados, com o pedido e a resposta (ver ui/runs-model.ts). */
-  async runs(): Promise<RunView[]> {
+  async runs(signal?: AbortSignal): Promise<RunView[]> {
     if (this.mock || this.replay) return [];
     try {
-      const res = await fetch('/api/runs');
+      const res = await fetch('/api/runs', { signal });
       if (!res.ok) return [];
       const data = (await res.json()) as { runs?: RunView[] };
       return Array.isArray(data.runs) ? data.runs : [];

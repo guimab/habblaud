@@ -43,6 +43,10 @@ import { PermissionCard } from './permission';
 import { canRenameRoom } from './roomrename';
 import { ProjectSection } from './project';
 import { CardSection, NewCardRow } from './card';
+import { AgentTabs } from './agent-tabs';
+import { ConsultPanel } from './consult';
+import { panelRun, linkedRunAgent } from './agent-panel-routing-model';
+import { openAgentPanel, type AgentPanelState } from './agent-panel-model';
 import { runPrompt, runReply, runsOfAgent, runStateLabel, type RunView } from './runs-model';
 import { pathsLabel } from './project-model';
 import { accountChipLabel, accountProvider, CODEX_LIVE_HINT, codexApprovalLabel, providerOf } from './provider';
@@ -212,10 +216,33 @@ function updateShellItem(li: HTMLElement, j: ShellJob, now: number): void {
 
 // ---------------------------------------------------------------- visão do agente
 
+/** Copied primitives: snapshots may mutate AgentInfo in place without changing its id. */
+type AgentTargetIdentity = Readonly<{ agentId: string; sessionId?: string; cardId?: string }>;
+
+function agentTargetIdentity(id: string, a?: AgentInfo): AgentTargetIdentity {
+  return { agentId: id, sessionId: a?.driverSession ?? a?.sessionId, cardId: a?.cardId };
+}
+
+function sameAgentTarget(a: AgentTargetIdentity | undefined, b: AgentTargetIdentity): boolean {
+  return !!a && a.agentId === b.agentId && a.sessionId === b.sessionId && a.cardId === b.cardId;
+}
+
 class AgentView {
   readonly el: HTMLElement;
   private id = '';
+  private targetIdentity?: AgentTargetIdentity;
   private last: AgentInfo | null = null;
+  private active = false;
+  private panelState: AgentPanelState = { target: null, tab: 'work', detailsOpen: false };
+  private readonly tabs = new AgentTabs(tab => {
+    this.panelState = { ...this.panelState, tab };
+    if (tab === 'work' && this.ctx.selection()?.id === this.id && (this.ctx.agent(this.id)?.cardId || this.panelState.target?.kind === 'run')) this.conversation?.show();
+    else this.conversation?.hide();
+  });
+  private readonly conversation: ConsultPanel;
+  private readonly work: HTMLElement;
+  private readonly liveWork: HTMLElement;
+  private readonly liveHeader: HTMLElement;
   private history: Activity[] = [];
   private historyReq = 0;
   /** Sobe ao trocar ao vivo ↔ replay ou ao retroceder: a resposta da geração anterior não entra. */
@@ -289,9 +316,12 @@ class AgentView {
   private runsEmpty: HTMLElement;
   private runsSec: ReturnType<typeof section>;
   private runs: RunView[] = [];
+  /** Normalized /api/runs list as fetched; `runs` is re-derived from it against each snapshot. */
+  private rawRuns: RunView[] = [];
   /** Chave do que está desenhado na lista de conversas (evita redesenhar a cada quadro). */
   private runsKey = '';
   private runsReq = 0;
+  private runsController?: AbortController;
   /** Quantos itens da linha do tempo aparecem agora. */
   private timelineShown = TIMELINE_STEP;
   private stats: KvList<StatKey>;
@@ -306,7 +336,17 @@ class AgentView {
     private ctx: UiContext,
     private terminal: TerminalControl,
     private pty: PtyControl,
+    private readonly onTargetChange: () => void,
   ) {
+    const record = h('p', { class: 'ui-agent-work__run' });
+    this.conversation = new ConsultPanel(ctx, { embedded: true, readRun: true, onClose: () => ctx.select(null), onRun: run => {
+      setAttr(this.work, 'data-run-id', run?.runId);
+      const live = !run && this.panelState.target?.kind !== 'run';
+      setHidden(this.liveWork, !live);
+      setHidden(this.liveHeader, !live);
+      setText(record, run ? `${runStateLabel(run.state)} · ${run.prompt ?? tr('Registro antigo: o pedido não foi gravado.')}` : '');
+    } });
+    this.work = h('div', { class: 'ui-agent-work' }, record, this.conversation.el);
     this.avatar = createAvatarPlaceholder('lg');
     this.name = h('h2', { class: 'ui-hero__name' });
     this.role = h('span', { class: 'ui-role' });
@@ -321,7 +361,7 @@ class AgentView {
     const heroText = h(
       'div',
       { class: 'ui-hero__text' },
-      h('div', { class: 'ui-hero__line' }, this.name, this.character.button, this.role),
+      h('div', { class: 'ui-hero__line' }, this.name, this.role),
       h('div', { class: 'ui-hero__acc' }, this.accChip, this.accName, this.accProv, this.accEmail),
       h('div', { class: 'ui-hero__where' }, h('span', { class: 'ui-muted', text: tr('Sala') }), this.roomBtn),
     );
@@ -443,32 +483,20 @@ class AgentView {
     ]);
     const statsSec = section(tr('Estatísticas'), this.stats.el);
     this.codexHint = h('p', { class: 'ui-codex-hint', hidden: true }, ...richText(CODEX_LIVE_HINT));
+    this.liveHeader = h('div', { class: 'ui-agent-live-header' }, this.title, this.gone, statusRow);
+    this.liveWork = h('div', { class: 'ui-agent-live-work' }, this.termBtn, this.termWhy, this.alert, this.perm.el, this.shellBox,
+      this.shellsSec.el, nowSec.el, this.msgSec.el, this.tasksSec.el, this.teamSec.el, this.codexHint);
 
     this.el = h(
       'div',
       { class: 'ui-drawer__view ui-agent-view' },
       h('div', { class: 'ui-hero' }, this.avatar, heroText),
-      this.character.el,
-      this.title,
-      this.gone,
-      statusRow,
-      this.cardSec.el,
-      this.termBtn,
-      this.termWhy,
-      this.alert,
-      this.perm.el,
-      this.shellBox,
-      this.shellsSec.el,
-      nowSec.el,
-      this.msgSec.el,
-      this.social.el,
-      this.tasksSec.el,
-      this.teamSec.el,
-      this.runsSec.el,
-      this.timelineSec.el,
-      statsSec.el,
-      this.codexHint,
+      this.liveHeader,
+      this.tabs.el,
     );
+    this.tabs.mount('work', h('div', {}, this.work, this.liveWork));
+    this.tabs.mount('history', h('div', {}, this.runsSec.el, this.timelineSec.el, statsSec.el));
+    this.tabs.mount('config', h('div', {}, this.character.button, this.character.el, this.cardSec.el, this.social.el));
   }
 
   get agentId(): string {
@@ -476,7 +504,25 @@ class AgentView {
   }
 
   open(id: string): void {
-    if (this.id === id) return;
+    this.bindTarget(id, this.ctx.agent(id));
+  }
+
+  /** One lifecycle for selection, reopening and in-place snapshot changes. */
+  private bindTarget(id: string, a?: AgentInfo): void {
+    // A session leaving the snapshot keeps its last readonly record, not a new empty target.
+    const target = !a && this.id === id && this.targetIdentity ? this.targetIdentity : agentTargetIdentity(id, a);
+    const unchanged = sameAgentTarget(this.targetIdentity, target);
+    if (unchanged && this.active) return;
+    this.cardSec.render(undefined);
+    this.active = true;
+    if (!unchanged) {
+      this.onTargetChange();
+      this.targetIdentity = target;
+      this.panelState = openAgentPanel(id);
+      // Clear even when the new session retains the same card: drafts belong to session + card.
+      this.conversation.clearTarget();
+    }
+    this.tabs.setTab(this.panelState.tab);
     this.character.open(id);
     this.id = id;
     this.last = null;
@@ -488,9 +534,35 @@ class AgentView {
     this.shells.clear();
     this.actDetails.open = false;
     this.runs = [];
+    this.rawRuns = [];
     this.runsKey = '';
     this.loadHistory();
     this.loadRuns();
+    if (unchanged && this.panelState.target?.kind === 'run') {
+      if (this.panelState.tab === 'work') this.conversation.show();
+    } else if (a?.cardId) this.chatCard({ id: a.cardId, name: a.name, refresh: unchanged });
+    else this.conversation.clearTarget();
+  }
+
+  chatCard(card: { id: string; name: string; fresh?: boolean; refresh?: boolean }): void {
+    this.tabs.setTab('work');
+    this.conversation.openCard(card);
+    this.conversation.show();
+  }
+
+  openRun(run: RunView): void {
+    this.panelState = { target: { kind: 'run', runId: run.runId, agentId: this.id || undefined }, tab: 'work', detailsOpen: false };
+    this.tabs.setTab('work');
+    this.conversation.openRun(run.runId, run.owner);
+    this.conversation.show();
+  }
+
+  close(): void {
+    this.active = false;
+    this.cardSec.render(undefined);
+    this.runsReq++;
+    this.runsController?.abort();
+    this.conversation.hide();
   }
 
   /** Turnos deste agente (GET /api/runs), com o pedido ao lado da resposta. */
@@ -498,13 +570,16 @@ class AgentView {
     const id = this.id;
     if (!id) return;
     const req = ++this.runsReq;
+    this.runsController?.abort();
+    const controller = this.runsController = new AbortController();
     this.ctx.store
-      .runs()
+      .runs(controller.signal)
       .then((all) => {
-        if (req !== this.runsReq) return;
+        if (req !== this.runsReq || controller.signal.aborted || this.id !== id) return;
         const a = this.ctx.agent(id);
         if (!a) return;
-        this.runs = runsOfAgent(all, a);
+        this.rawRuns = all.map(panelRun).filter((r): r is RunView => !!r);
+        this.runs = runsOfAgent(this.rawRuns, a, this.ctx.store.snapshot?.agents ?? []);
         this.ctx.invalidate();
       })
       .catch(() => {
@@ -588,6 +663,7 @@ class AgentView {
 
   render(): void {
     const live = this.ctx.agent(this.id);
+    if (this.active && live) this.bindTarget(this.id, live);
     if (live) this.last = live;
     const a = this.last;
     if (!a) return;
@@ -683,7 +759,9 @@ class AgentView {
     // Mandar mensagem: só para principais presentes (com o recurso ligado e a página local; sem o plugin, a dica).
     // Ficha dormindo (sem sessão aberta): conversa pelo botão Conversar da ficha, não por terminal/mensagem.
     const sleeping = a.status === 'sleeping';
-    setHidden(this.msgSec.el, sleeping || this.composer.render(live, this.id) === 'off');
+    setHidden(this.work, !a.cardId && this.panelState.target?.kind !== 'run');
+    this.composer.render(live, this.id);
+    setHidden(this.msgSec.el, true);
     setHidden(this.termBtn, sleeping);
     this.cardSec.render(live);
 
@@ -716,14 +794,19 @@ class AgentView {
     }
 
     // Conversas deste agente: o pedido e a resposta de cada turno, para achar o que ele fez sem abrir o terminal.
-    const convs = this.runs;
+    // Re-derived every render: other agents in the snapshot may make the link ambiguous (no new GET).
+    const convs = this.runs = runsOfAgent(this.rawRuns, a, this.ctx.store.snapshot?.agents ?? []);
     setHidden(this.runsSec.el, convs.length === 0 && a.kind === 'sub');
     setText(this.runsSec.extra, convs.length ? String(convs.length) : '');
     setHidden(this.runsEmpty, convs.length > 0);
     const runsKey = `${a.id}|${convs.map((r) => `${r.runId}:${r.state}:${r.at}`).join(',')}`;
     if (this.runsKey !== runsKey) {
       this.runsKey = runsKey;
-      this.runsList.replaceChildren(...convs.map(createRunItem));
+      this.runsList.replaceChildren(...convs.map(r => {
+        const item = createRunItem(r);
+        item.append(h('button', { class: 'ui-btn ui-run-open', type: 'button', text: tr('Abrir conversa'), on: { click: () => { this.tabs.setTab('work'); this.ctx.openRun?.(r.runId, r.owner); } } }));
+        return item;
+      }));
     }
 
     // Linha do tempo (mais recente primeiro). No replay, nada depois do instante reproduzido.
@@ -1047,7 +1130,10 @@ export class Drawer implements UiComponent {
   private body: HTMLElement;
   private agentView: AgentView;
   private roomView: RoomView;
-  private mode: 'agent' | 'room' | null = null;
+  private mode: 'agent' | 'room' | 'run' | null = null;
+  private runRequest?: AbortController;
+  private standalone?: { el: HTMLElement; panel: ConsultPanel };
+  private standaloneOpen = false;
   private heading: HTMLElement;
   private resizeHandle: HTMLElement;
   private width = AGENT_PANEL_DEFAULT_WIDTH;
@@ -1061,10 +1147,14 @@ export class Drawer implements UiComponent {
     terminal: TerminalControl,
     pty: PtyControl,
   ) {
-    this.agentView = new AgentView(ctx, terminal, pty);
+    this.agentView = new AgentView(ctx, terminal, pty, () => {
+      // Snapshot rebinding is a selection change for pending record reads, even with the same id.
+      this.runRequest?.abort();
+      this.runRequest = undefined;
+    });
     this.roomView = new RoomView(ctx, pty);
     this.heading = h('span', { class: 'ui-drawer__kind' });
-    const close = iconButton(ICONS.close, tr('Fechar detalhes (Esc)'), () => ctx.select(null));
+    const close = iconButton(ICONS.close, tr('Fechar detalhes (Esc)'), () => { this.selectionChanged(); ctx.select(null); this.render(); this.onLayoutChange?.(); });
     this.body = h('div', { class: 'ui-drawer__body' });
     const bar = h('div', { class: 'ui-drawer__bar' }, this.heading, close);
     this.el = h(
@@ -1158,24 +1248,76 @@ export class Drawer implements UiComponent {
     this.onLayoutChange?.();
   }
 
+  chatCard(card: { id: string; name: string; fresh?: boolean }): void {
+    this.render();
+    this.agentView.chatCard(card);
+  }
+
+  selectionChanged(): void {
+    this.runRequest?.abort();
+    this.runRequest = undefined;
+    this.standaloneOpen = false;
+    this.standalone?.panel.hide();
+  }
+
+  async openRun(runId: string): Promise<void> {
+    this.runRequest?.abort();
+    const controller = this.runRequest = new AbortController();
+    try {
+      const res = await fetch(`/api/runs/${encodeURIComponent(runId)}`, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+      if (!res.ok) throw new Error(tr('Registro de execução indisponível.'));
+      const run = panelRun(await res.json());
+      if (controller.signal.aborted || this.runRequest !== controller) return;
+      if (!run || run.runId !== runId) throw new Error(tr('Registro de execução indisponível.'));
+      // O GET terminou: a seleção legítima abaixo não cancela a própria abertura.
+      this.runRequest = undefined;
+      const agent = linkedRunAgent(run, this.ctx.store.snapshot?.agents ?? []);
+      if (agent) {
+        this.ctx.select({ type: 'agent', id: agent.id });
+        this.render();
+        this.agentView.openRun(run);
+      } else {
+        this.ctx.select(null);
+        if (!this.standalone) {
+          const record = h('p', { class: 'ui-agent-work__run' });
+          const work = h('div', { class: 'ui-agent-work' }, record);
+          const panel = new ConsultPanel(this.ctx, { embedded: true, readRun: true, onClose: () => { this.selectionChanged(); this.render(); this.onLayoutChange?.(); }, onRun: value => {
+            work.dataset.runId = value?.runId ?? '';
+            setText(record, value ? `${runStateLabel(value.state)} · ${value.prompt ?? tr('Registro antigo: o pedido não foi gravado.')}` : '');
+          } });
+          work.append(panel.el);
+          this.standalone = { el: work, panel };
+        }
+        this.standaloneOpen = true;
+        this.render();
+        this.standalone.panel.openRun(run.runId, run.owner);
+        this.standalone.panel.show();
+        this.onLayoutChange?.();
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) this.ctx.announce(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   toggleFollow(): void {
     if (this.mode === 'agent') this.agentView.toggleFollow();
   }
 
   render(): void {
     const sel = this.ctx.selection();
-    const mode = sel?.type ?? null;
+    const mode = this.standaloneOpen ? 'run' : sel?.type ?? null;
     if (mode !== this.mode) {
       // Gaveta fechada ou fora do agente: o editor fecha, e ao reabrir começa do estado atual do agente.
-      if (this.mode === 'agent') this.agentView.character.close();
+      if (this.mode === 'agent') { this.agentView.character.close(); this.agentView.close(); }
       this.mode = mode;
       if (mode === null && this.resizing) this.endResize(this.resizing.pointerId, false);
-      this.body.replaceChildren(...(mode === 'agent' ? [this.agentView.el] : mode === 'room' ? [this.roomView.el] : []));
+      this.body.replaceChildren(...(mode === 'agent' ? [this.agentView.el] : mode === 'room' ? [this.roomView.el] : mode === 'run' && this.standalone ? [this.standalone.el] : []));
       this.body.scrollTop = 0;
       this.el.classList.toggle('is-open', mode !== null);
       setAttr(this.el, 'aria-hidden', mode ? 'false' : 'true');
       this.el.inert = mode === null;
     }
+    if (mode === 'run') { setText(this.heading, tr('Conversa')); return; }
     if (sel?.type === 'agent') {
       if (this.agentView.agentId !== sel.id) this.body.scrollTop = 0;
       this.agentView.open(sel.id);

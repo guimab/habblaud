@@ -1,6 +1,7 @@
 // Conversas de um agente (ui/drawer.ts): os turnos que ele já rodou, do mais recente ao mais antigo, com o pedido
 // que os originou. Os runs vêm de GET /api/runs (um registro por turno; ver server/runs/manager.ts).
-import type { RunState, RunView } from '../../../shared/types';
+import type { AgentInfo, RunState, RunView } from '../../../shared/types';
+import { linkedRunAgent } from './agent-panel-routing-model';
 import { tr } from '../../../shared/i18n';
 
 export type { RunState, RunView };
@@ -38,17 +39,15 @@ export function runStateLabel(state: RunState): string {
   }
 }
 
-/** O run é deste agente? (pela sessão do driver ou pela ficha: o agente dorminhoco tem id `card:<cardId>`.) */
-export function runBelongsTo(r: RunView, agent: { id: string; sessionId?: string; cardId?: string }): boolean {
-  if (agent.sessionId && r.owner.sessionId === agent.sessionId) return true;
-  const cardId = agent.cardId ?? (agent.id.startsWith('card:') ? agent.id.slice('card:'.length) : undefined);
-  return !!cardId && r.owner.id === cardId;
+/** Mesma associação canônica do roteador, considerando todos os agentes para ambiguidades. */
+export function runBelongsTo(r: RunView, agent: AgentInfo, agents: readonly AgentInfo[]): boolean {
+  return linkedRunAgent(r, agents)?.id === agent.id;
 }
 
 /** Conversas do agente, da mais recente para a mais antiga (no máximo `limit`). */
-export function runsOfAgent(runs: readonly RunView[], agent: { id: string; sessionId?: string; cardId?: string }, limit = 10): RunView[] {
+export function runsOfAgent(runs: readonly RunView[], agent: AgentInfo, agents: readonly AgentInfo[], limit = 10): RunView[] {
   return runs
-    .filter((r) => runBelongsTo(r, agent))
+    .filter((r) => runBelongsTo(r, agent, agents))
     .sort((a, b) => b.at - a.at)
     .slice(0, limit);
 }

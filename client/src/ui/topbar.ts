@@ -126,8 +126,7 @@ export class TopBar implements UiComponent {
     this.spawnBtn.hidden = true;
     this.consultPanel = new ConsultPanel(ctx);
     ctx.root.append(this.consultPanel.el);
-    ctx.chatCard = (card) => this.consultPanel.openCard(card, this.consultBtn);
-    ctx.openRun = (runId, owner) => this.consultPanel.openRun(runId, owner, this.consultBtn);
+    // Agent navigation is owned by createUI/Drawer, never by the transient Advisor.
     this.inboxPanel = new InboxPanel(ctx);
     ctx.root.append(this.inboxPanel.el);
     this.consultBtn = iconButton(ICONS.consult, tr('Consultor: pergunta rápida numa sessão nova do Hermes (C)'), () => this.consultPanel.toggle(this.consultBtn), 'ui-btn-consult');

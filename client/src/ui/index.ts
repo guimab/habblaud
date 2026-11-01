@@ -122,7 +122,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
       else area.clearIntent();
       // A gaveta passa a contar na área livre ANTES do foco: o mundo centraliza já na parte visível.
       const prev = selection;
-      selection = sel;
+      setSelection(sel);
       area.selectingFromUi();
       applyLayout({ refocus: false });
       uiSelecting = true;
@@ -245,6 +245,13 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   };
   if (typeof location !== 'undefined') openLink(new URL(location.href));
   drawer = new Drawer(ctx, terminal, pty);
+  ctx.openRun = runId => { void drawer.openRun(runId); };
+  ctx.chatCard = card => {
+    const agents = (store.snapshot?.agents ?? []).filter(a => a.cardId === card.id);
+    if (agents.length !== 1) return;
+    ctx.select({ type: 'agent', id: agents[0].id });
+    drawer.chatCard(card);
+  };
   const feed = new FeedPanel(ctx);
   const toasts = new Toasts(ctx);
   const updateToaster = new UpdateToaster(ctx, (n) => toasts.push(n));
@@ -303,7 +310,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el }, () => ({
     sidebar: panels.sidebar,
     feed: panels.feed,
-    drawer: selection !== null && !drawer.floating,
+    drawer: (selection !== null || drawer.isOpen) && !drawer.floating,
     narrow: ctx.isNarrow(),
   }));
   drawer.onLayoutChange = () => applyLayout();
@@ -345,10 +352,17 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   function applyLayout(opts: { refocus?: boolean } = {}): void {
     root.classList.toggle('has-sidebar', panels.sidebar);
     root.classList.toggle('has-feed', panels.feed);
-    root.classList.toggle('has-drawer', selection !== null && !drawer.floating);
+    root.classList.toggle('has-drawer', (selection !== null || drawer.isOpen) && !drawer.floating);
     root.classList.toggle('is-narrow', ctx.isNarrow());
     drawer.syncLayout();
     area.sync(opts);
+  }
+
+  // Toda entrada (lista/UI ou canvas) invalida a observação uma única vez.
+  function setSelection(sel: Selection): void {
+    const prev = selection;
+    selection = sel;
+    if (prev?.type !== sel?.type || prev?.id !== sel?.id || !sel) drawer.selectionChanged();
   }
 
   // ---------------------------------------------------------------- eventos
@@ -362,7 +376,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   onAccessChange(() => invalidate());
   world.onSelect((sel) => {
     const prev = selection;
-    selection = sel;
+    if (!uiSelecting) setSelection(sel);
+    drawer.render();
     // Clique no canvas (ou agente que saiu): a gaveta espera a janela do duplo clique antes de mexer na câmera.
     if (!uiSelecting) area.selectionChangedExternally(prev, sel);
     applyLayout(uiSelecting ? { refocus: false } : {});
@@ -415,7 +430,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
       } else if (ctx.isNarrow() && panels.sidebar) {
         ctx.togglePanel('sidebar', false);
         e.preventDefault();
-      } else if (selection) {
+      } else if (selection || drawer.isOpen) {
+        drawer.selectionChanged();
         ctx.select(null);
         e.preventDefault();
       }

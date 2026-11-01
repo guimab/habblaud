@@ -64,6 +64,7 @@ export class CardSection {
   private readonly msg: HTMLElement;
   private agent?: AgentInfo;
   private loadedFor = '';
+  private generation = 0;
   private card?: CardDto;
   private readonly schedules = new ScheduleSection();
 
@@ -78,7 +79,7 @@ export class CardSection {
     this.editBox = h(
       'div',
       { class: 'ui-card' },
-      h('div', { class: 'ui-project__row' }, h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--allow', type: 'button', text: tr('Conversar'), on: { click: () => this.chat() } }), h('button', { class: 'ui-btn', type: 'button', text: tr('Nova conversa'), title: tr('Abre uma sessão nova para este agente'), on: { click: () => void this.newSession() } })),
+      h('div', { class: 'ui-project__row' }, h('button', { class: 'ui-btn ui-perm__btn ui-perm__btn--allow ui-card-btn--chat', type: 'button', text: tr('Conversar'), on: { click: () => this.chat() } }), h('button', { class: 'ui-btn', type: 'button', text: tr('Nova conversa'), title: tr('Abre uma sessão nova para este agente'), on: { click: () => void this.newSession() } })),
       field(tr('Nome'), this.name),
       field(tr('Papel'), this.role),
       field(tr('Projeto'), this.project),
@@ -99,20 +100,26 @@ export class CardSection {
     this.agent = a;
     const can = access().agents === true;
     const show = !!a && can && (!!a.cardId || !!a.driverSession);
-    setHidden(this.el, !show);
-    if (!show || !a) return;
-    setHidden(this.editBox, !a.cardId);
-    setHidden(this.adoptBox, !!a.cardId);
-    if (a.cardId) {
-      setHidden(this.releaseBtn, !a.driverSession);
-      if (this.loadedFor !== a.cardId) {
-        this.loadedFor = a.cardId;
-        void this.load(a.cardId);
+    const target = show && a ? a.cardId || `adopt:${a.id}` : '';
+    if (target !== this.loadedFor) {
+      this.generation++;
+      this.loadedFor = target;
+      this.card = undefined;
+      this.schedules.invalidate();
+      for (const f of [this.name, this.role, this.model, this.instructions, this.project]) f.value = '';
+      this.adoptSel.replaceChildren();
+      this.say('');
+      if (show && a) {
+        if (a.cardId) void this.load(a.cardId);
+        else void this.loadAdopt();
       }
-    } else if (this.loadedFor !== `adopt:${a.id}`) {
-      this.loadedFor = `adopt:${a.id}`;
-      void this.loadAdopt();
     }
+    setHidden(this.el, !show);
+    setHidden(this.editBox, !a?.cardId || !this.card);
+    this.editBox.inert = !this.card;
+    for (const control of this.editBox.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>('button,input,select,textarea')) control.disabled = !this.card;
+    setHidden(this.adoptBox, !!a?.cardId);
+    if (show && a?.cardId) setHidden(this.releaseBtn, !a.driverSession);
   }
 
   private say(text: string, error = false): void {
@@ -121,8 +128,10 @@ export class CardSection {
   }
 
   private async load(id: string): Promise<void> {
+    const generation = this.generation;
     try {
       const c = await cardCall<CardDto>('GET', `/api/cards/${encodeURIComponent(id)}`);
+      if (generation !== this.generation) return;
       this.card = c;
       this.name.value = c.name;
       this.role.value = c.role ?? '';
@@ -130,15 +139,21 @@ export class CardSection {
       this.model.value = c.model ?? '';
       this.instructions.value = c.instructions ?? '';
       void this.schedules.load(c.id);
+      setHidden(this.editBox, false);
+      this.editBox.inert = false;
+      for (const control of this.editBox.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>('button,input,select,textarea')) control.disabled = false;
       this.say('');
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
 
   private async loadAdopt(): Promise<void> {
+    const generation = this.generation;
     try {
       const { cards } = await cardCall<{ cards: CardDto[] }>('GET', '/api/cards');
+      if (generation !== this.generation) return;
       this.adoptSel.replaceChildren(
         h('option', { attrs: { value: '' }, text: tr('Adotar em…') }),
         h('option', { attrs: { value: '+' }, text: tr('Novo agente') }),
@@ -146,62 +161,77 @@ export class CardSection {
       );
       this.say('');
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
 
   private async save(): Promise<void> {
     const id = this.agent?.cardId;
-    if (!id) return;
+    if (!id || this.card?.id !== id) return;
+    const generation = this.generation;
     try {
-      this.card = await cardCall<CardDto>('PATCH', `/api/cards/${encodeURIComponent(id)}`, {
+      const card = await cardCall<CardDto>('PATCH', `/api/cards/${encodeURIComponent(id)}`, {
         name: this.name.value.trim(),
         role: this.role.value.trim() || null,
         projectId: this.project.value || null,
         model: this.model.value.trim() || null,
         instructions: this.instructions.value.trim() || null,
       });
+      if (generation !== this.generation) return;
+      this.card = card;
       this.say(tr('Salvo.'));
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
 
   private chat(): void {
     const id = this.agent?.cardId;
-    if (id) this.ctx.chatCard?.({ id, name: this.card?.name ?? this.agent!.name });
+    if (id && this.card?.id === id) this.ctx.chatCard?.({ id, name: this.card.name });
   }
 
   private async newSession(): Promise<void> {
     const id = this.agent?.cardId;
-    if (!id) return;
+    if (!id || this.card?.id !== id) return;
+    const generation = this.generation;
+    const name = this.card.name;
     try {
       await cardCall('POST', `/api/cards/${encodeURIComponent(id)}/sessions`);
-      this.ctx.chatCard?.({ id, name: this.card?.name ?? this.agent!.name, fresh: true });
+      if (generation !== this.generation) return;
+      this.ctx.chatCard?.({ id, name, fresh: true });
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
 
   private async release(): Promise<void> {
     const a = this.agent;
-    if (!a?.cardId || !a.driverSession) return;
+    if (!a?.cardId || !a.driverSession || this.card?.id !== a.cardId) return;
+    const generation = this.generation;
     try {
       await cardCall('POST', `/api/cards/${encodeURIComponent(a.cardId)}/release`, { sessionId: a.driverSession });
+      if (generation !== this.generation) return;
       this.say(tr('Sessão solta.'));
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
 
   private async remove(): Promise<void> {
     const id = this.agent?.cardId;
-    if (!id || !confirm(tr('Apagar a ficha de {0}? As sessões continuam no driver.', [this.card?.name ?? this.agent!.name]))) return;
+    if (!id || this.card?.id !== id || !confirm(tr('Apagar a ficha de {0}? As sessões continuam no driver.', [this.card?.name ?? this.agent!.name]))) return;
+    const generation = this.generation;
     try {
       await cardCall('DELETE', `/api/cards/${encodeURIComponent(id)}`);
-      this.loadedFor = '';
+      if (generation !== this.generation) return;
+      this.render(undefined);
       this.say(tr('Ficha apagada.'));
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }
@@ -210,7 +240,15 @@ export class CardSection {
     const a = this.agent;
     const v = this.adoptSel.value;
     this.adoptSel.value = '';
-    if (!a?.driverSession || !v) return;
+    if (!a?.driverSession || !v || this.loadedFor !== `adopt:${a.id}`) return;
+    const generation = this.generation;
+    // Primitives: snapshots may mutate AgentInfo in place while the creation POST is pending.
+    const agentId = a.id;
+    const sessionId = a.driverSession;
+    const stillTarget = (): boolean => {
+      const cur = this.agent;
+      return generation === this.generation && this.loadedFor === `adopt:${agentId}` && cur?.id === agentId && cur.driverSession === sessionId && !cur.cardId;
+    };
     try {
       let id = v;
       if (v === '+') {
@@ -218,11 +256,15 @@ export class CardSection {
         if (!name) return;
         const projectId = projectOf(a.roomId);
         id = (await cardCall<CardDto>('POST', '/api/cards', { name, ...(projectId ? { projectId } : {}) })).id;
+        // Obsolete target: the created card may remain, but never adopt into another session.
+        if (!stillTarget()) return;
       }
-      await cardCall('POST', `/api/cards/${encodeURIComponent(id)}/adopt`, { sessionId: a.driverSession });
-      this.loadedFor = '';
+      await cardCall('POST', `/api/cards/${encodeURIComponent(id)}/adopt`, { sessionId });
+      if (generation !== this.generation) return;
+      this.render(undefined);
       this.say(tr('Adotado.'));
     } catch (err) {
+      if (generation !== this.generation) return;
       this.say(err instanceof Error ? err.message : String(err), true);
     }
   }

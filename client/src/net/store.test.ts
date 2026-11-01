@@ -295,6 +295,18 @@ describe('fonte alternativa (timelapse)', () => {
   });
 });
 
+describe('run observation cancellation', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('passes caller AbortSignal to GET /api/runs', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"runs":[]}'));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    await (new OfficeStore().runs as (signal?: AbortSignal) => Promise<unknown>)(controller.signal);
+    expect(fetchMock).toHaveBeenCalledWith('/api/runs', { signal: controller.signal });
+  });
+});
+
 describe('personagem do projeto (store)', () => {
   afterEach(() => vi.unstubAllGlobals());
 

@@ -151,6 +151,20 @@ project's room (in **No project** when it has no project), with its own characte
 - **Promote to agent…:** turns an Advisor consultation into a profile in a project.
 - Changing profiles requires the `agents` feature on the phone port (`HABBLAUD_REMOTE_ALLOW`).
 
+The side panel keeps the office visible, has adjustable width and opens on **Work**:
+
+- **Work:** embedded conversation, request and status of the selected run. A sleeping profile or one without a run
+  opens the composer without automatically executing a turn. An external session with no profile shows activity,
+  without inventing a profile chat.
+- **History:** the agent's recorded conversations; opening one returns to that same run in Work, without starting
+  another.
+- **Configuration:** profile and character editor. Changing tabs on the same target preserves the draft; changing
+  targets never reuses the previous target's messages or replies.
+
+Chatting with a profile and opening a run from the Inbox use this same panel, not the Advisor popover. Closing the
+panel or leaving Work only ends local observation, without sending **Stop**. The executor continues working. Older
+records may lack the request, and the available API data does not guarantee a complete history.
+
 ## Inbox and background runs
 
 A turn started by the office is a **run** (`runs.json`): it keeps going with no one watching, is resumed from where
@@ -186,6 +200,7 @@ profile's current session as a background run, and the reply lands in the Inbox 
 The **Advisor** (`C`) opens a quick question in a **new Hermes session**, with optional free context ("who you are,
 what you're doing, what matters") and a checkbox to include what you're looking at (selected agent or room). It
 archives itself after 30 minutes idle, and can be promoted to a profile in a project (**Promote to agent…**).
+In this delivery, the standalone Advisor remains a separate popover; profile and run conversations use the side panel.
 
 ## What it looks like
 

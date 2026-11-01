@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { runPrompt, runReply, runsOfAgent, runStateLabel, type RunView } from './runs-model';
+import type { AgentInfo } from '../../../shared/types';
+
+function agent(p: Partial<AgentInfo>): AgentInfo {
+  return { id: 'x', kind: 'main', roomId: 'room', name: 'Agent', look: 'm', role: 'Agent',
+    sessionId: '', account: 'local', status: 'sleeping', recent: [], tasks: [], startedAt: 0,
+    lastEventAt: 0, statusSince: 0, stats: { toolCalls: 0, tokensIn: 0, tokensOut: 0, subagents: 0 }, seed: 1, ...p };
+}
 
 function run(p: Partial<RunView> & { runId: string }): RunView {
   return { state: 'done', text: '', at: 1, owner: { kind: 'card', id: 'c1', sessionId: 's1' }, ...p };
@@ -13,16 +20,20 @@ describe('runsOfAgent', () => {
   ];
 
   it('traz só os turnos do agente, do mais recente ao mais antigo', () => {
-    expect(runsOfAgent(runs, { id: 'x', sessionId: 's1' }).map((r) => r.runId)).toEqual(['r2', 'r1']);
+    const a = agent({ sessionId: 's1' });
+    expect(runsOfAgent(runs, a, [a]).map((r) => r.runId)).toEqual(['r2', 'r1']);
   });
 
-  it('casa pela ficha quando o agente não tem sessão viva (dorminhoco)', () => {
-    expect(runsOfAgent(runs, { id: 'card:c1' }).map((r) => r.runId)).toEqual(['r2', 'r1']);
-    expect(runsOfAgent(runs, { id: 'card:c2' })).toEqual([]);
+  it('casa pela ficha explícita quando o agente não tem sessão viva (dorminhoco)', () => {
+    const a = agent({ id: 'card:c1', cardId: 'c1' });
+    const b = agent({ id: 'card:c2', cardId: 'c2' });
+    expect(runsOfAgent(runs, a, [a, b]).map((r) => r.runId)).toEqual(['r2', 'r1']);
+    expect(runsOfAgent(runs, b, [a, b])).toEqual([]);
   });
 
   it('respeita o limite', () => {
-    expect(runsOfAgent(runs, { id: 'x', sessionId: 's1' }, 1).map((r) => r.runId)).toEqual(['r2']);
+    const a = agent({ sessionId: 's1' });
+    expect(runsOfAgent(runs, a, [a], 1).map((r) => r.runId)).toEqual(['r2']);
   });
 });
 

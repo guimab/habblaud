@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:4751';
 const scenario = process.argv[3] ?? 'all';
-assert(['embedded', 'close', 'abort', 'pending', 'delayed', 'http-error', 'sse-race', 'all'].includes(scenario), `Unknown scenario: ${scenario}`);
+assert(['embedded', 'close', 'abort', 'pending', 'delayed', 'http-error', 'sse-race', 'target', 'resume', 'all'].includes(scenario), `Unknown scenario: ${scenario}`);
 const bundled = await build({ entryPoints: ['client/src/ui/consult.ts'], bundle: true, format: 'esm', platform: 'browser', write: false });
 const calls = [], streams = new Set(), closed = [];
 let deferredList, deferRuns = false, deferredCreation, deferCreation = false;
@@ -241,6 +241,39 @@ try {
     assert.equal(calls.filter(c => c.path.endsWith('/events')).length, before, 'closed view ignores late discovery');
     assert.equal(await page.evaluate(() => window.__panel.isOpen), false);
     deferRuns = false;
+  }
+  if (scenario === 'resume' || scenario === 'all') {
+    await mount();
+    await page.evaluate(() => window.__panel.openRun('r-resume', { kind: 'card', id: 'c1' }));
+    await page.locator('#qa-work .ui-consult__turn--assistant .ui-md__h').waitFor();
+    await page.locator('#qa-work .ui-consult__input').fill('Rascunho do mesmo alvo');
+    const previous = closed.length;
+    await page.evaluate(() => window.__panel.disposeView());
+    await waitClosed(previous);
+    assert.equal(await page.evaluate(() => typeof window.__panel.show), 'function', 'returning to Work needs explicit show, not toggle');
+    await page.evaluate(() => window.__panel.show());
+    await page.locator('#qa-work .ui-consult__turn--assistant .ui-md__h').waitFor();
+    assert.equal(await page.locator('#qa-work .ui-consult__input').inputValue(), 'Rascunho do mesmo alvo');
+    assert.equal(await page.locator('#qa-work .ui-consult__turn--assistant').count(), 1);
+    assert.equal(await page.evaluate(() => window.__panel.isOpen), true);
+  }
+  if (scenario === 'target' || scenario === 'all') {
+    await mount();
+    await page.locator('#qa-work button').filter({ hasText: /^Nova consulta$/ }).click();
+    deferCreation = true;
+    await page.locator('#qa-work .ui-consult__input').fill('Rascunho de A');
+    await page.locator('#qa-work .ui-consult__input').press('Control+Enter');
+    for (let i = 0; i < 30 && !deferredCreation; i++) await new Promise(resolve => setTimeout(resolve, 50));
+    assert(deferredCreation);
+    await page.evaluate(() => window.__panel.openCard({ id: 'c2', name: 'Agente B', fresh: true }));
+    const before = calls.filter(c => c.path.endsWith('/messages')).length;
+    deferredCreation.writeHead(200, { 'Content-Type': 'application/json' });
+    deferredCreation.end(JSON.stringify({ id: 'consult-a' }));
+    await page.waitForTimeout(300);
+    assert.equal(calls.filter(c => c.path.endsWith('/messages')).length, before, 'switching target invalidates delayed session creation');
+    assert.equal(await page.locator('#qa-work .ui-consult__input').inputValue(), '', 'draft A never leaks into B');
+    assert.equal(await page.locator('#qa-work .ui-consult__status').textContent(), '');
+    deferCreation = false;
   }
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ passed: true, scenario, stopRequests: calls.filter(c => c.path.endsWith('/stop')).length, closedSubscriptions: closed.length }, null, 2));

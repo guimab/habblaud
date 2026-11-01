@@ -12,6 +12,9 @@ do meio (0.**3**.0).
 
 ### Documentação
 
+- **Painel de trabalho documentado nos dois READMEs:** abas Trabalho/Histórico/Configuração, conversa de ficha e run
+  no mesmo painel, rascunho preservado no mesmo alvo e fechamento sem Parar; Consultor avulso separado nesta entrega.
+
 - **README dos dois idiomas (inglês e português) alinhado com o estado do fork.** Entraram as seções do fork e do
   driver do Hermes (`HABBLAUD_HERMES_URL`/`HABBLAUD_HERMES_KEY`), Projetos, Fichas de agente, Inbox e runs em segundo
   plano, Agendas e Consultor; o tema Cyberpunk, o selo "concluiu", o filtro "Só conversa", o contador de sessões e a
